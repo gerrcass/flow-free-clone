@@ -4,6 +4,7 @@ import type { BoardState } from '../game/reducer';
 import type { BoardAction } from '../game/reducer';
 import type { CellPos } from '../game/types';
 import { samePos } from '../game/cells';
+import { DrawSession } from '../game/drawSession';
 import './Board.css';
 
 /** Temporary fixture palette (distinct branding lands with #4). */
@@ -46,50 +47,37 @@ function cellFromPoint(x: number, y: number): CellPos | null {
 
 export default function Board({ state, dispatch }: BoardProps) {
   const { level } = state;
-  const drawing = useRef(false);
-  const moved = useRef(false);
+  // Deferred-start session: pressing an Endpoint records a pending press;
+  // the destructive `start` is only flushed on the first move, so an
+  // aborted press (cancel before moving) leaves the existing Pipe intact.
+  const session = useRef(new DrawSession());
 
   const handleDown = (at: CellPos) => {
     const colorId = endpointAt(state, at);
     if (colorId === null) return;
-    drawing.current = true;
-    moved.current = false;
-    dispatch({ type: 'start', colorId, at });
+    session.current.down(colorId, at);
   };
 
   const handleEnter = (at: CellPos) => {
-    if (!drawing.current) return;
-    moved.current = true;
-    dispatch({ type: 'extend', at });
+    for (const action of session.current.enter(at)) dispatch(action);
   };
 
   const handleMove = (e: ReactPointerEvent) => {
     // Touch slides keep implicit pointer capture on the start Cell, so
     // per-Cell enter events never fire: hit-test the Cell under the pointer.
-    if (!drawing.current || e.pointerType === 'mouse') return;
+    if (e.pointerType === 'mouse') return;
     const at = cellFromPoint(e.clientX, e.clientY);
     if (at === null) return;
-    moved.current = true;
-    dispatch({ type: 'extend', at });
+    for (const action of session.current.moveTo(at)) dispatch(action);
   };
 
   const handleUp = (at: CellPos) => {
-    if (!drawing.current) return;
-    drawing.current = false;
     const colorId = endpointAt(state, at);
-    // A press-and-release on an Endpoint without entering another Cell is a
-    // tap: clear the whole Pipe. `start` already reset it to a single Cell,
-    // so clearing unconditionally restores the empty Pipe.
-    if (!moved.current && colorId !== null) {
-      dispatch({ type: 'clear', colorId });
-    }
-    dispatch({ type: 'end' });
+    for (const action of session.current.up(colorId)) dispatch(action);
   };
 
   const cancel = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    dispatch({ type: 'end' });
+    for (const action of session.current.cancel()) dispatch(action);
   };
 
   return (
