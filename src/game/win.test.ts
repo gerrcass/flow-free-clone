@@ -65,6 +65,35 @@ describe('win-check (rule 5)', () => {
     expect(isConnected(FIXTURE_LEVEL, 'R', pipes)).toBe(false);
   });
 
+  it('is not connected when the Pipe passes through a rival Pipe Cell', () => {
+    const pipes = straightRowPipes();
+    // G runs from (1,0) to (1,4) but detours through R Cells at (0,2) and (0,3).
+    pipes['G'] = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 0, col: 2 },
+      { row: 0, col: 3 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+    ];
+    expect(isConnected(FIXTURE_LEVEL, 'G', pipes)).toBe(false);
+  });
+
+  it('is not solved when Pipes overlap on full Board coverage', () => {
+    const pipes = straightRowPipes();
+    pipes['G'] = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 0, col: 2 },
+      { row: 0, col: 3 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+    ];
+    expect(isSolved(FIXTURE_LEVEL, pipes)).toBe(false);
+  });
+
   it('reports Board fill ratio', () => {
     expect(fillRatio(FIXTURE_LEVEL, straightRowPipes())).toBe(1);
     const empty: Record<string, CellPos[]> = { R: [], G: [], B: [], Y: [], P: [] };

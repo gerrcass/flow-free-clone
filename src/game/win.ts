@@ -20,6 +20,12 @@ export function isConnected(level: Level, colorId: string, pipes: Record<string,
       c.endpoints.some((e) => middle.some((cell) => samePos(cell, e))),
   );
   if (crossesRivalEndpoint) return false;
+  const rivalCells = new Set<string>();
+  for (const [otherId, otherPipe] of Object.entries(pipes)) {
+    if (otherId === colorId) continue;
+    for (const cell of otherPipe) rivalCells.add(cellKey(cell));
+  }
+  if (pipe.some((cell) => rivalCells.has(cellKey(cell)))) return false;
   return true;
 }
 
@@ -36,6 +42,9 @@ export function fillRatio(level: Level, pipes: Record<string, CellPos[]>): numbe
 }
 
 export function isSolved(level: Level, pipes: Record<string, CellPos[]>): boolean {
-  if (filledCells(pipes).size !== level.size * level.size) return false;
+  const all = Object.values(pipes).flat();
+  const filled = filledCells(pipes);
+  if (filled.size !== all.length) return false;
+  if (filled.size !== level.size * level.size) return false;
   return level.colors.every((c) => isConnected(level, c.id, pipes));
 }
