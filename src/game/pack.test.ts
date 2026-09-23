@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PACK } from './pack';
+import { PACK, PACKS } from './pack';
 import { PACK_PLAN, generatePack } from './generator';
 import { createInitialState, reducer } from './reducer';
 import { solveLevel } from './solver';
@@ -65,4 +65,34 @@ describe('Pack integrity (#2)', () => {
       }
     },
   );
+});
+
+describe('Multi-Pack store (#12)', () => {
+  it('ships three named Packs with Difficulty labels', () => {
+    expect(PACKS.map((p) => p.id)).toEqual(['starter', 'classic', 'expert']);
+    expect(PACKS.map((p) => p.name)).toEqual(['Starter', 'Classic', 'Expert']);
+    expect(PACKS.map((p) => p.difficulty)).toEqual(['starter', 'classic', 'expert']);
+  });
+
+  it('partitions the legacy flat Pack in order, ten Levels per Pack', () => {
+    expect(PACKS.map((p) => p.levels.length)).toEqual([10, 10, 10]);
+    expect(PACKS.flatMap((p) => p.levels)).toEqual(PACK);
+  });
+
+  it('ramps structural Difficulty across Packs', () => {
+    const maxSize = (i: number) => Math.max(...PACKS[i].levels.map((l) => l.size));
+    const maxColors = (i: number) =>
+      Math.max(...PACKS[i].levels.map((l) => l.colors.length));
+    expect(PACKS[0].levels[0].size).toBe(5);
+    expect(PACKS[2].levels[PACKS[2].levels.length - 1].size).toBe(8);
+    expect(maxSize(0)).toBeLessThanOrEqual(maxSize(1));
+    expect(maxSize(1)).toBeLessThanOrEqual(maxSize(2));
+    expect(maxColors(0)).toBeLessThanOrEqual(maxColors(1));
+    expect(maxColors(1)).toBeLessThanOrEqual(maxColors(2));
+    for (const pack of PACKS) {
+      expect(pack.levels[0].size).toBeLessThanOrEqual(
+        pack.levels[pack.levels.length - 1].size,
+      );
+    }
+  });
 });
