@@ -1,49 +1,56 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Board from './components/Board';
 import LevelSelect from './components/LevelSelect';
-import { PACK } from './game/pack';
+import { PACKS } from './game/pack';
 import {
   completeLevel,
   createDefaultSettings,
-  loadProgress,
+  loadPackProgress,
   loadSettings,
   resetProgress,
-  saveProgress,
+  savePackProgress,
   saveSettings,
 } from './game/progress';
-import type { Settings } from './game/progress';
+import type { PackProgress, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
 import { GAME_NAME } from './game/theme';
 import { fillRatio, isSolved } from './game/win';
 import './App.css';
 
+interface Selection {
+  packId: string;
+  index: number;
+}
+
 function PlayLevel({
-  index,
+  selection,
   settings,
   onWin,
   onExit,
   onNext,
 }: {
-  index: number;
+  selection: Selection;
   settings: Settings;
-  onWin: (index: number) => void;
+  onWin: (packId: string, index: number) => void;
   onExit: () => void;
   onNext: () => void;
 }) {
+  const pack = PACKS.find((p) => p.id === selection.packId) ?? PACKS[0];
+  const levelNumber = selection.index + 1;
   const [state, dispatch] = useReducer(reducer, undefined, () =>
-    createInitialState(PACK[index]),
+    createInitialState(pack.levels[selection.index]),
   );
   const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
   const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
-  const hasNext = index + 1 < PACK.length;
+  const hasNext = selection.index + 1 < pack.levels.length;
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
   const wasSolved = useRef(false);
 
   useEffect(() => {
-    if (solved) onWin(index);
-  }, [solved, index, onWin]);
+    if (solved) onWin(pack.id, selection.index);
+  }, [solved, pack.id, selection.index, onWin]);
 
   useEffect(() => {
     // Fire only on the solving transition: flipping the sound toggle
@@ -53,7 +60,7 @@ function PlayLevel({
   }, [solved, settings.sound]);
 
   return (
-    <section aria-label={`Level ${index + 1}`}>
+    <section aria-label={`${pack.name} Level ${levelNumber}`}>
       <p className="hud" aria-live="polite">
         Filled {Math.round(fill * 100)}%
       </p>
@@ -62,10 +69,11 @@ function PlayLevel({
         <div
           className={settings.animation ? 'win-overlay win-animated' : 'win-overlay'}
           role="dialog"
-          aria-label={`Level ${index + 1} complete`}
+          aria-label={`${pack.name} Level ${levelNumber} complete`}
         >
           <p className="win" role="status">
-            Level {index + 1} complete: every Cell filled and every Color connected.
+            {pack.name} Level {levelNumber} complete: every Cell filled and every
+            Color connected.
           </p>
           {hasNext ? (
             <button type="button" onClick={onNext}>
@@ -88,9 +96,12 @@ function PlayLevel({
   );
 }
 
-function readProgress(): boolean[] {
-  if (typeof localStorage === 'undefined') return [];
-  return loadProgress(localStorage, PACK.length);
+function readProgress(): PackProgress {
+  if (typeof localStorage === 'undefined') return loadPackProgress(
+    { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    PACKS,
+  );
+  return loadPackProgress(localStorage, PACKS);
 }
 
 function readSettings() {
@@ -99,28 +110,29 @@ function readSettings() {
 }
 
 function App() {
-  const [selected, setSelected] = useState<number | null>(null);
-  const [completed, setCompleted] = useState<boolean[]>(readProgress);
+  const [selected, setSelected] = useState<Selection | null>(null);
+  const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [settings, setSettings] = useState(readSettings);
 
   useEffect(() => {
-    saveProgress(localStorage, completed);
+    savePackProgress(localStorage, completed);
   }, [completed]);
 
   useEffect(() => {
     saveSettings(localStorage, settings);
   }, [settings]);
 
-  const handleWin = (index: number) => {
+  const handleWin = (packId: string, index: number) => {
     setCompleted((prev) => {
-      if (prev[index] === true) return prev;
-      return completeLevel(prev, index);
+      const arr = prev[packId] ?? [];
+      if (arr[index] === true) return prev;
+      return { ...prev, [packId]: completeLevel(arr, index) };
     });
   };
 
   const handleReset = () => {
     resetProgress(localStorage);
-    setCompleted(loadProgress(localStorage, PACK.length));
+    setCompleted(loadPackProgress(localStorage, PACKS));
     setSettings(createDefaultSettings());
     setSelected(null);
   };
@@ -131,7 +143,11 @@ function App() {
       <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       {selected === null ? (
         <>
-          <LevelSelect completed={completed} onSelect={setSelected} />
+          <LevelSelect
+            packs={PACKS}
+            progress={completed}
+            onSelect={(packId, index) => setSelected({ packId, index })}
+          />
           <fieldset className="settings">
             <legend>Settings</legend>
             <label>
@@ -159,15 +175,21 @@ function App() {
         </>
       ) : (
         <PlayLevel
-          key={selected}
-          index={selected}
+          key={`${selected.packId}:${selected.index}`}
+          selection={selected}
           settings={settings}
           onWin={handleWin}
           onExit={() => setSelected(null)}
           onNext={() => {
-            // Winning just completed `selected`, so the next Level is
-            // unlocked by construction; at the Pack end return to select.
-            setSelected(selected + 1 < PACK.length ? selected + 1 : null);
+            // Winning just completed `selected`, so the next Level in this
+            // Pack is unlocked by construction; at the Pack end return to
+            // select.
+            const pack = PACKS.find((p) => p.id === selected.packId) ?? PACKS[0];
+            setSelected(
+              selected.index + 1 < pack.levels.length
+                ? { packId: pack.id, index: selected.index + 1 }
+                : null,
+            );
           }}
         />
       )}
