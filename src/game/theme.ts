@@ -15,18 +15,34 @@ export const GAME_NAME = 'Pipe Trails';
 export const DISPLAY_FONT_FAMILY = 'Pipe Trails Display';
 export const DISPLAY_FONT_FILE = 'fonts/baloo-2-latin.woff2';
 
+/** Domain id for a puzzle Color (R, G, B, Y, P, O, C, M). */
+export type ColorId = string;
+
 /**
- * Original 8-Color palette keyed by Pack Color id.
- * Chosen for separation on dark Cells (min ~25° hue distance between any
- * two Colors); not sampled from any existing game.
+ * Retuned 8-Color palette keyed by Pack Color id (#13).
+ * Every Color holds >=4:1 contrast against the dark Cell fill (#262933)
+ * with >=25° hue distance between any two Colors (tightest pair Y/O at
+ * ~26°); identities unchanged
+ * from the original set, brightened where the old values dipped (B, P,
+ * O, M, R) so open Pipes stay legible next to the white Endpoint rings.
+ * Not sampled from any existing game.
  */
-export const PALETTE: Record<string, string> = {
-  R: '#ef476f',
+export const PALETTE: Record<ColorId, string> = {
+  R: '#f2557a',
   G: '#06d6a0',
-  B: '#3a86ff',
+  B: '#5b9bff',
   Y: '#ffe66d',
-  P: '#9b5de5',
-  O: '#f3722c',
+  P: '#b388ff',
+  O: '#f97f2e',
   C: '#a3e635',
-  M: '#d946ef',
+  M: '#e052f5',
 };
+
+/**
+ * Hex for a Color id with a neutral fallback for unknown ids (#13).
+ * Single source for Board Pipes, Endpoint rings, and HUD swatches so
+ * the retuned palette reaches the DOM the same way everywhere.
+ */
+export function colorHex(colorId: ColorId): string {
+  return PALETTE[colorId] ?? '#999';
+}

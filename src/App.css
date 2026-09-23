@@ -66,6 +66,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Per-Color HUD dots (#13): one swatch plus id per Color; connected dots
+ * read solid, open dots dim with a dashed rim so color is never the only
+ * signal (the listitem label carries "connected" / "not connected"). */
+.hud-colors {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.hud-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 4px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  opacity: 0.75;
+}
+
+.hud-dot-connected {
+  border-style: solid;
+  opacity: 1;
+}
+
+.hud-dot-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Visually-hidden status words (#13): exposed to assistive tech inside
+ * the HUD Color items, never painted. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .win {
   margin-top: 16px;
   font-weight: 600;
@@ -76,6 +122,30 @@
   padding: 16px;
   border: 1px solid currentColor;
   border-radius: 12px;
+}
+
+/* Restyled win card (#13): dark card on the Board palette with a gold
+ * star row and grouped actions. Honors the Animation toggle via
+ * .win-animated plus the prefers-reduced-motion query below. */
+.win-card {
+  background: #1c1e26;
+  border-radius: 12px;
+  padding: 20px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.win-stars {
+  font-size: 1.25rem;
+  letter-spacing: 2px;
+  color: #ffd166;
+}
+
+.win-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 /* Minimal win celebration: the overlay pops in and the message glows

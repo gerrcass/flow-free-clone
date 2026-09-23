@@ -1,5 +1,6 @@
 import type { CellPos, Level } from './types';
 import { cellKey, isAdjacent, samePos } from './cells';
+import type { BoardState } from './reducer';
 
 export function isConnected(level: Level, colorId: string, pipes: Record<string, CellPos[]>): boolean {
   const def = level.colors.find((c) => c.id === colorId);
@@ -27,6 +28,18 @@ export function isConnected(level: Level, colorId: string, pipes: Record<string,
   }
   if (pipe.some((cell) => rivalCells.has(cellKey(cell)))) return false;
   return true;
+}
+
+/**
+ * Connected state of one Color on a live Board (#13). Single selector
+ * over the win-check seam so Board Pipes, Endpoint rings, and HUD dots
+ * never disagree about the same Color.
+ */
+export function isBoardColorConnected(
+  state: Pick<BoardState, 'level' | 'pipes'>,
+  colorId: string,
+): boolean {
+  return isConnected(state.level, colorId, state.pipes);
 }
 
 export function filledCells(pipes: Record<string, CellPos[]>): Set<string> {

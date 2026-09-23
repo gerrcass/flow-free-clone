@@ -5,7 +5,9 @@ import type { BoardAction } from '../game/reducer';
 import type { CellPos } from '../game/types';
 import { samePos } from '../game/cells';
 import { DrawSession } from '../game/drawSession';
-import { PALETTE } from '../game/theme';
+import { colorHex } from '../game/theme';
+import { isBoardColorConnected } from '../game/win';
+import { connectedClass } from './connectedClass';
 import './Board.css';
 
 interface BoardProps {
@@ -88,6 +90,13 @@ export default function Board({ state, dispatch }: BoardProps) {
           const at = { row, col };
           const endpoint = endpointAt(state, at);
           const occupant = occupantOf(state, at);
+          // Connected-Pipe styling (#13): a Pipe reads connected only
+          // through the win-check seam, so Board color never disagrees
+          // with the HUD dots or the solved state.
+          const occupantConnected =
+            occupant !== null && isBoardColorConnected(state, occupant);
+          const endpointConnected =
+            endpoint !== null && isBoardColorConnected(state, endpoint);
           return (
             <div
               key={`${row},${col}`}
@@ -109,14 +118,14 @@ export default function Board({ state, dispatch }: BoardProps) {
             >
               {occupant !== null && (
                 <span
-                  className="pipe"
-                  style={{ backgroundColor: PALETTE[occupant] ?? '#999' }}
+                  className={connectedClass('pipe', occupantConnected)}
+                  style={{ backgroundColor: colorHex(occupant) }}
                 />
               )}
               {endpoint !== null && (
                 <span
-                  className="endpoint"
-                  style={{ backgroundColor: PALETTE[endpoint] ?? '#999' }}
+                  className={connectedClass('endpoint', endpointConnected)}
+                  style={{ backgroundColor: colorHex(endpoint) }}
                 />
               )}
             </div>
