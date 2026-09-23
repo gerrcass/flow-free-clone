@@ -14,6 +14,9 @@ const PALETTE: Record<string, string> = {
   B: '#3e63dd',
   Y: '#e2a336',
   P: '#8e4ec6',
+  O: '#f76b15',
+  C: '#12a594',
+  M: '#d6409f',
 };
 
 interface BoardProps {

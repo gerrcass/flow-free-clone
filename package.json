@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate-pack": "tsc scripts/generate-pack.ts src/game/generator.ts src/game/types.ts --ignoreConfig --outDir node_modules/.tmp/packgen --module commonjs --target es2022 --skipLibCheck --types node && node node_modules/.tmp/packgen/scripts/generate-pack.js",
+    "check-pack": "tsc scripts/check-pack.ts --ignoreConfig --outDir node_modules/.tmp/packcheck --module commonjs --target es2022 --skipLibCheck --types node && node node_modules/.tmp/packcheck/scripts/check-pack.js"
   },
   "dependencies": {
     "react": "^19.2.8",
