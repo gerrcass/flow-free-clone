@@ -71,4 +71,38 @@ describe('playWinSound', () => {
       vi.useRealTimers();
     }
   });
+
+  it('waits for resume before scheduling when the context starts suspended', async () => {
+    const context = stubContext();
+    let resolveResume!: () => void;
+    const resumed = new Promise<void>((resolve) => {
+      resolveResume = resolve;
+    });
+    context.resume = vi.fn(() => resumed);
+    playWinSound({ enabled: true, createContext: () => context });
+    // Scheduling must wait for the suspended clock to run.
+    expect(context.oscillators.length).toBe(0);
+    resolveResume();
+    await resumed;
+    // Flush the .then(schedule) microtask.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(context.oscillators.length).toBe(2);
+    for (const osc of context.oscillators) {
+      expect(osc.start).toHaveBeenCalledTimes(1);
+      expect(osc.stop).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('still schedules the chime when resume rejects', async () => {
+    const context = stubContext();
+    context.resume = vi.fn(() => Promise.reject(new Error('denied')));
+    playWinSound({ enabled: true, createContext: () => context });
+    expect(context.oscillators.length).toBe(0);
+    // Let the rejection handler run.
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(context.oscillators.length).toBe(2);
+  });
 });

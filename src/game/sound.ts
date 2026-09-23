@@ -60,37 +60,54 @@ export function playWinSound(options: WinSoundOptions): void {
     return;
   }
   if (!context) return;
-  try {
-    // Autoplay policies may leave a fresh context suspended; the win
-    // always follows a user gesture, so resume is expected to succeed.
+  const schedule = () => {
     try {
-      void context.resume?.();
+      const ctx = context as WinAudioContext;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(VOLUME, ctx.currentTime);
+      gain.connect(ctx.destination);
+      NOTES.forEach((frequency, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        const at = ctx.currentTime + i * NOTE_LENGTH;
+        osc.frequency.setValueAtTime(frequency, at);
+        osc.connect(gain);
+        osc.start(at);
+        osc.stop(at + NOTE_LENGTH);
+      });
+      // One context is created per win: release it once the chime is done.
+      // The close timer starts after scheduling so it can't win a race
+      // against notes scheduled on a resumed currentTime.
+      const doneAfterMs = (NOTES.length * NOTE_LENGTH + 0.05) * 1000;
+      const played = ctx;
+      setTimeout(() => {
+        try {
+          void played.close?.();
+        } catch {
+          // Ignore: the page may already be gone.
+        }
+      }, doneAfterMs);
     } catch {
-      // Ignore: a suspended context just plays silently.
+      // Audio is decoration: a failure must never break the win flow.
     }
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(VOLUME, context.currentTime);
-    gain.connect(context.destination);
-    NOTES.forEach((frequency, i) => {
-      const osc = context.createOscillator();
-      osc.type = 'sine';
-      const at = context.currentTime + i * NOTE_LENGTH;
-      osc.frequency.setValueAtTime(frequency, at);
-      osc.connect(gain);
-      osc.start(at);
-      osc.stop(at + NOTE_LENGTH);
-    });
-    // One context is created per win: release it once the chime is done.
-    const doneAfterMs = (NOTES.length * NOTE_LENGTH + 0.05) * 1000;
-    const played = context;
-    setTimeout(() => {
-      try {
-        void played.close?.();
-      } catch {
-        // Ignore: the page may already be gone.
-      }
-    }, doneAfterMs);
+  };
+  try {
+    // Autoplay policies may leave a fresh context suspended with a frozen
+    // currentTime; schedule only after resume settles so the notes land on
+    // a running clock and close() can't win the race.
+    let resumed: Promise<void> | void;
+    try {
+      resumed = context.resume?.();
+    } catch {
+      schedule();
+      return;
+    }
+    if (resumed && typeof (resumed as Promise<void>).then === 'function') {
+      (resumed as Promise<void>).then(schedule, schedule);
+      return;
+    }
   } catch {
     // Audio is decoration: a failure must never break the win flow.
   }
+  schedule();
 }
