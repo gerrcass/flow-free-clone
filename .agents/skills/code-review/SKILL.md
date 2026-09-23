@@ -77,6 +77,17 @@ Present the two reports under `## Standards` and `## Spec` headings, verbatim or
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.
 
+### 6. Act on the reviewed PR
+
+First record one of the two verdicts: **approved** (both axes clean — no hard violations, no missing/wrong spec behaviour; judgement-call smells alone don't block) or **changes requested** (blocking findings on either axis).
+
+- If **approved**: the PR is safe to land, so land it — an approved verdict always closes out with a merge, never stalls:
+  1. Push any outstanding local fix commits that belong to the PR first, so the merged code is exactly what was reviewed. Keep unrelated commits off the PR branch.
+  2. Leave the aggregated report (or a summary) as a PR comment recording the approval.
+  3. Merge the PR (`gh pr merge <number> --merge`) and delete the branch.
+  4. Close the originating ticket with a comment pointing at the merged PR, if the merge didn't auto-close it.
+- If **changes requested**: leave the aggregated report as a PR comment for review and mark the PR `ready-for-agent` (via `gh pr edit <number> --add-label "ready-for-agent"`, cf. `docs/agents/triage-labels.md`) so implementation can continue. Never merge or close a PR that still has blocking findings.
+
 ## Why two axes
 
 A change can pass one axis and fail the other:
