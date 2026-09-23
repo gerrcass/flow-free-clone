@@ -8,6 +8,12 @@ import WinOverlay from './components/WinOverlay';
 import { computePar, starsForPar } from './game/challenge';
 import { PACKS, findPackById } from './game/pack';
 import {
+  SHARE_HASH_PREFIX,
+  copyShareLink,
+  loadSharedLevelFromHash,
+} from './game/share';
+import type { Level } from './game/types';
+import {
   completeLevel,
   createDefaultSettings,
   emptyPackStars,
@@ -28,7 +34,63 @@ import './App.css';
 type Route =
   | { name: 'welcome' }
   | { name: 'level-select'; packId?: string }
-  | { name: 'level'; selection: ContinueTarget };
+  | { name: 'level'; selection: ContinueTarget }
+  | { name: 'shared'; level: Level };
+
+function SharedPlay({
+  level,
+  settings,
+  onExit,
+}: {
+  level: Level;
+  settings: Settings;
+  onExit: () => void;
+}) {
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    createInitialState(level),
+  );
+  const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
+  const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
+  const colorStatuses = useMemo(
+    () =>
+      state.level.colors.map((c) => ({
+        id: c.id,
+        connected: isBoardColorConnected(state, c.id),
+      })),
+    [state],
+  );
+  const par = useMemo(() => computePar(level), [level]);
+  const [copied, setCopied] = useState(false);
+  const wasSolved = useRef(false);
+
+  useEffect(() => {
+    if (solved && !wasSolved.current) playWinSound({ enabled: settings.sound });
+    wasSolved.current = solved;
+  }, [solved, settings.sound]);
+
+  return (
+    <section aria-label="Shared Level">
+      <Hud fillPercent={Math.round(fill * 100)} par={par} stars={0} colors={colorStatuses} />
+      <Board state={state} dispatch={dispatch} />
+      {solved ? (
+        <p role="status">
+          Shared Level complete: every Cell filled and every Color connected.
+        </p>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => {
+          void copyShareLink(level).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Link copied' : 'Share Level'}
+      </button>{' '}
+      <button type="button" onClick={onExit}>
+        Welcome Screen
+      </button>
+    </section>
+  );
+}
 
 function PlayLevel({
   selection,
@@ -72,6 +134,8 @@ function PlayLevel({
   );
   const starsAvailable = par === null ? null : starsForPar(par);
   const hasNext = selection.index + 1 < pack.levels.length;
+  const [copied, setCopied] = useState(false);
+  const shareLevel = pack.levels[selection.index];
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
   const wasSolved = useRef(false);
@@ -106,7 +170,15 @@ function PlayLevel({
         <button type="button" onClick={onExit}>
           Level select
         </button>
-      )}
+      )}{' '}
+      <button
+        type="button"
+        onClick={() => {
+          void copyShareLink(shareLevel).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Link copied' : 'Share Level'}
+      </button>
     </section>
   );
 }
@@ -129,11 +201,58 @@ function readSettings() {
   return loadSettings(localStorage);
 }
 
+/** Read the current location hash as a shared Level route (#16). */
+function readSharedRoute(): { route: Route; invalid: boolean } {
+  try {
+    const hash = window.location.hash;
+    if (!hash.startsWith(SHARE_HASH_PREFIX)) return { route: { name: 'welcome' }, invalid: false };
+    const level = loadSharedLevelFromHash(hash);
+    if (level === null) return { route: { name: 'welcome' }, invalid: true };
+    return { route: { name: 'shared', level }, invalid: false };
+  } catch {
+    return { route: { name: 'welcome' }, invalid: false };
+  }
+}
+
+/** Clear the share fragment so a plain reload returns to Welcome. */
+function clearShareHash(): void {
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch {
+    // Non-browser/test env: nothing to clear.
+  }
+}
+
 function App() {
-  const [route, setRoute] = useState<Route>({ name: 'welcome' });
+  const [route, setRoute] = useState<Route>(() => {
+    if (typeof window === 'undefined') return { name: 'welcome' };
+    return readSharedRoute().route;
+  });
+  const [sharedInvalid, setSharedInvalid] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return readSharedRoute().invalid;
+  });
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
+
+  // Opening a pasted share link mid-session loads the same verified Board
+  // as a fresh load (#16); the hash fragment never hits the network, so
+  // this also works offline after first load.
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = readSharedRoute();
+      if (next.invalid) {
+        setSharedInvalid(true);
+        setRoute({ name: 'welcome' });
+      } else if (next.route.name === 'shared') {
+        setSharedInvalid(false);
+        setRoute(next.route);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     savePackProgress(localStorage, completed, stars);
@@ -160,8 +279,31 @@ function App() {
     setRoute({ name: 'welcome' });
   };
 
+  const exitShared = () => {
+    clearShareHash();
+    setSharedInvalid(false);
+    setRoute({ name: 'welcome' });
+  };
+
   return (
     <main className="app">
+      {sharedInvalid && (
+        <p role="alert">
+          That shared Level link is invalid or unsolvable.{' '}
+          <button
+            type="button"
+            onClick={() => {
+              clearShareHash();
+              setSharedInvalid(false);
+            }}
+          >
+            Dismiss
+          </button>
+        </p>
+      )}
+      {route.name === 'shared' && (
+        <SharedPlay level={route.level} settings={settings} onExit={exitShared} />
+      )}
       {route.name === 'welcome' && (
         <Welcome
           packs={PACKS}
