@@ -1,8 +1,8 @@
 import { formatStars } from '../game/challenge';
-import { PALETTE } from '../game/theme';
+import { colorHex, type ColorId } from '../game/theme';
 
 export interface HudColorStatus {
-  id: string;
+  id: ColorId;
   connected: boolean;
 }
 
@@ -16,8 +16,10 @@ interface HudProps {
 /**
  * In-Level HUD (#13, #14): fill percent stays the primary signal, with the
  * solver-derived Par, the earned star slot, and one dot per Color carrying
- * its connected state beside it. Dots render as a list so assistive tech
- * meets "R connected" / "G not connected" items, not color-only glyphs.
+ * its connected state beside it. Dots render as a list whose items expose
+ * "R connected" / "G not connected" twice: an explicit label plus visible
+ * text with a visually-hidden status word, so the state survives even
+ * where the item label is ignored and color is never the only signal.
  */
 export default function Hud({ fillPercent, par, stars, colors = [] }: HudProps) {
   return (
@@ -40,9 +42,12 @@ export default function Hud({ fillPercent, par, stars, colors = [] }: HudProps) 
               <span
                 aria-hidden="true"
                 className="hud-dot-swatch"
-                style={{ backgroundColor: PALETTE[color.id] ?? '#999' }}
+                style={{ backgroundColor: colorHex(color.id) }}
               />
-              <span aria-hidden="true">{color.id}</span>
+              {color.id}{' '}
+              <span className="visually-hidden">
+                {color.connected ? 'connected' : 'not connected'}
+              </span>
             </li>
           ))}
         </ul>

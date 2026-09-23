@@ -5,8 +5,8 @@ import type { BoardAction } from '../game/reducer';
 import type { CellPos } from '../game/types';
 import { samePos } from '../game/cells';
 import { DrawSession } from '../game/drawSession';
-import { PALETTE } from '../game/theme';
-import { isConnected } from '../game/win';
+import { colorHex } from '../game/theme';
+import { isBoardColorConnected } from '../game/win';
 import './Board.css';
 
 interface BoardProps {
@@ -93,9 +93,9 @@ export default function Board({ state, dispatch }: BoardProps) {
           // through the win-check seam, so Board color never disagrees
           // with the HUD dots or the solved state.
           const occupantConnected =
-            occupant !== null && isConnected(state.level, occupant, state.pipes);
+            occupant !== null && isBoardColorConnected(state, occupant);
           const endpointConnected =
-            endpoint !== null && isConnected(state.level, endpoint, state.pipes);
+            endpoint !== null && isBoardColorConnected(state, endpoint);
           return (
             <div
               key={`${row},${col}`}
@@ -120,7 +120,7 @@ export default function Board({ state, dispatch }: BoardProps) {
                   className={
                     occupantConnected ? 'pipe pipe-connected' : 'pipe pipe-open'
                   }
-                  style={{ backgroundColor: PALETTE[occupant] ?? '#999' }}
+                  style={{ backgroundColor: colorHex(occupant) }}
                 />
               )}
               {endpoint !== null && (
@@ -130,7 +130,7 @@ export default function Board({ state, dispatch }: BoardProps) {
                       ? 'endpoint endpoint-connected'
                       : 'endpoint endpoint-open'
                   }
-                  style={{ backgroundColor: PALETTE[endpoint] ?? '#999' }}
+                  style={{ backgroundColor: colorHex(endpoint) }}
                 />
               )}
             </div>

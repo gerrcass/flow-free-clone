@@ -22,7 +22,7 @@ import {
 import type { ContinueTarget, PackProgress, PackStars, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
-import { fillRatio, isConnected, isSolved } from './game/win';
+import { fillRatio, isBoardColorConnected, isSolved } from './game/win';
 import './App.css';
 
 type Route =
@@ -58,7 +58,7 @@ function PlayLevel({
     () =>
       state.level.colors.map((c) => ({
         id: c.id,
-        connected: isConnected(state.level, c.id, state.pipes),
+        connected: isBoardColorConnected(state, c.id),
       })),
     [state],
   );

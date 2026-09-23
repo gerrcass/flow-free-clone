@@ -101,6 +101,17 @@
   display: inline-block;
 }
 
+/* Visually-hidden status words (#13): exposed to assistive tech inside
+ * the HUD Color items, never painted. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .win {
   margin-top: 16px;
   font-weight: 600;
