@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { displayDifficulty, findPackById } from '../game/pack';
+import { findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
 import {
+  describePack,
   isUnlockedInPack,
-  packProgressCount,
   type PackProgress,
 } from '../game/progress';
 
@@ -26,38 +26,33 @@ export default function LevelSelect({
   const active = findPackById(packs, activePackId);
   if (!active) return null;
   const completed = progress[active.id] ?? [];
-  const { done, total } = packProgressCount(progress, active.id);
+  const { done, total, difficulty } = describePack(progress, active);
 
   return (
     <div className="level-select">
       <div role="tablist" aria-label="Packs">
         {packs.map((pack) => {
-          const count = packProgressCount(progress, pack.id);
+          const summary = describePack(progress, pack);
           const selected = pack.id === active.id;
-          const difficulty = displayDifficulty(pack.difficulty);
           return (
             <button
               key={pack.id}
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-label={`${pack.name} Pack, ${difficulty} Difficulty, ${count.done} of ${count.total} complete`}
+              aria-label={packAriaLabel(pack, summary.done, summary.total)}
               onClick={() => setActivePackId(pack.id)}
             >
-              {pack.name} · {difficulty} Difficulty · {count.done}/{count.total}
+              {pack.name} · {summary.difficulty} Difficulty · {summary.done}/
+              {summary.total}
             </button>
           );
         })}
       </div>
-      <section
-        role="tabpanel"
-        aria-label={`${active.name} Pack, ${displayDifficulty(active.difficulty)} Difficulty, ${done} of ${total} complete`}
-      >
+      <section role="tabpanel" aria-label={packAriaLabel(active, done, total)}>
         <h2>
           {active.name}{' '}
-          <span aria-label={`${displayDifficulty(active.difficulty)} Difficulty`}>
-            · {displayDifficulty(active.difficulty)}
-          </span>
+          <span aria-label={`${difficulty} Difficulty`}>· {difficulty}</span>
         </h2>
         <p aria-live="polite">
           {done} of {total} complete

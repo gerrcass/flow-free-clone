@@ -14,10 +14,30 @@
   opacity: 0.8;
 }
 
-/* Welcome Screen hero (#15): static by design, so no animation toggle or
- * reduced-motion handling is needed here; the win overlay above keeps both. */
+/* Welcome Screen hero (#15): a gentle rise on arrival, CSS-only on
+ * purpose — no settings toggle is involved, so there is nothing to
+ * conflate with the win-overlay motion, and prefers-reduced-motion
+ * disables it unconditionally. */
 .welcome-hero {
   margin-bottom: 16px;
+  animation: welcome-rise 0.4s ease-out;
+}
+
+@keyframes welcome-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-hero {
+    animation: none;
+  }
 }
 
 .welcome-packs {

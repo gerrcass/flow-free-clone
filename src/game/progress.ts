@@ -1,4 +1,6 @@
 import type { Level } from './types';
+import { displayDifficulty } from './pack';
+import type { Pack } from './pack';
 
 export const PROGRESS_KEY = 'flow-free-clone:progress:v1';
 export const PROGRESS_V2_KEY = 'flow-free-clone:progress:v2';
@@ -97,6 +99,26 @@ export function packProgressCount(
   const arr = progress[packId];
   if (!Array.isArray(arr)) return { done: 0, total: 0 };
   return { done: arr.filter((c) => c === true).length, total: arr.length };
+}
+
+export interface PackSummary {
+  done: number;
+  total: number;
+  difficulty: string;
+}
+
+/**
+ * One per-Pack shape for entry buttons, tabs, and panels (#15): progress
+ * counts plus display Difficulty, instead of recomputing the pair
+ * per call site.
+ */
+export function describePack(progress: PackProgress, pack: Pack): PackSummary {
+  const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
+  return {
+    done: arr.filter((c) => c === true).length,
+    total: pack.levels.length,
+    difficulty: displayDifficulty(pack.difficulty),
+  };
 }
 
 /**

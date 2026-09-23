@@ -5,6 +5,7 @@ import {
   SETTINGS_KEY,
   completeLevel,
   createDefaultSettings,
+  describePack,
   emptyPackProgress,
   findContinueTarget,
   groupBySize,
@@ -147,10 +148,22 @@ describe('per-Pack unlock (#12)', () => {
     expect(packProgressCount(progress, 'expert')).toEqual({ done: 0, total: 0 });
     expect(packProgressCount(progress, 'unknown')).toEqual({ done: 0, total: 0 });
   });
+
+  it('describes a Pack with progress and display Difficulty in one shape (#15)', () => {
+    expect(describePack({ starter: [true, false] }, PACKS[0])).toEqual({
+      done: 1,
+      total: 10,
+      difficulty: 'Starter',
+    });
+    expect(describePack({}, PACKS[1])).toEqual({
+      done: 0,
+      total: 10,
+      difficulty: 'Classic',
+    });
+  });
 });
 
-describe('continue target (#15)', () => {
-  const packsOf = (sizes: number[]) =>
+describe('continue target (#15)', () => {  const packsOf = (sizes: number[]) =>
     sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
 
   it('starts a fresh player at the first Level of the first Pack', () => {

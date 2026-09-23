@@ -1,6 +1,6 @@
-import { displayDifficulty, findPackById } from '../game/pack';
+import { findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
-import { findContinueTarget, packProgressCount } from '../game/progress';
+import { describePack, findContinueTarget } from '../game/progress';
 import type { ContinueTarget, PackProgress, Settings } from '../game/progress';
 import { GAME_NAME } from '../game/theme';
 import SettingsControls from './SettingsControls';
@@ -32,28 +32,49 @@ export default function Welcome({
   onContinue,
   onEnterPack,
 }: WelcomeProps) {
-  // Earliest unfinished Level in Pack order, or null when everything is
-  // complete: then Play (browse/replay) is the only affordance.
+  // Earliest unfinished Level in Pack order, or null when nothing is
+  // resumable (everything complete). Continue stays visible but greyed
+  // whenever there is nothing to resume — fresh or finished, mirroring
+  // the Time Trial pattern — while Play is always the way forward.
   const target = findContinueTarget(progress, packs);
   const targetPack = target ? findPackById(packs, target.packId) : undefined;
+  const hasProgress = packs.some(
+    (pack) => describePack(progress, pack).done > 0,
+  );
+  const complete =
+    packs.length > 0 &&
+    packs.every(
+      (pack) => describePack(progress, pack).done === pack.levels.length,
+    );
 
   return (
     <div className="welcome">
-      {/* Static hero on purpose (#15): gating its rise on the win-overlay
-        toggle conflated two settings, so the hero carries no motion and
-        reduced-motion holds trivially here. */}
+      {/* Hero rise is CSS-only (#15): no settings toggle involved, and
+        prefers-reduced-motion disables it — see App.css. */}
       <header className="welcome-hero">
         <h1>{GAME_NAME}</h1>
         <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       </header>
 
-      {target && targetPack && (
+      {target && targetPack && hasProgress ? (
         <button
           type="button"
           onClick={() => onContinue(target)}
           aria-label={`Continue ${targetPack.name} Level ${target.index + 1}`}
         >
           Continue: {targetPack.name} Level {target.index + 1}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled
+          aria-label={
+            complete
+              ? 'Continue: everything complete'
+              : 'Continue: no saved progress yet'
+          }
+        >
+          Continue
         </button>
       )}
       <button type="button" onClick={onPlay} aria-label={`Play ${GAME_NAME}`}>
@@ -76,14 +97,13 @@ export default function Welcome({
         <h2>Packs</h2>
         <ul className="welcome-packs">
           {packs.map((pack) => {
-            const { done, total } = packProgressCount(progress, pack.id);
-            const difficulty = displayDifficulty(pack.difficulty);
+            const { done, total, difficulty } = describePack(progress, pack);
             return (
               <li key={pack.id}>
                 <button
                   type="button"
                   onClick={() => onEnterPack(pack.id)}
-                  aria-label={`${pack.name} Pack, ${difficulty} Difficulty, ${done} of ${total} complete`}
+                  aria-label={packAriaLabel(pack, done, total)}
                 >
                   {pack.name} · {difficulty} · {done}/{total}
                 </button>

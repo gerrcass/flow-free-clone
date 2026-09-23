@@ -42,22 +42,30 @@ describe('Welcome routing (#15)', () => {
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 
-  it('offers a fresh player both Continue into Starter Level 1 and Play to browse', () => {
+  it('greys Continue for a fresh player: the affordance shows, Play moves', () => {
     render(<App />);
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Continue Starter Level 1' }),
-    );
-    expect(screen.getByRole('grid')).toBeTruthy();
-    expect(
-      screen.getByRole('region', { name: 'Starter Level 1' }),
-    ).toBeTruthy();
-  });
+    const cont = screen.getByRole('button', {
+      name: 'Continue: no saved progress yet',
+    });
+    expect((cont as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(cont);
+    expect(screen.queryByRole('grid')).toBeNull();
 
-  it('sends Play to Level select while Continue jumps straight into the Board', () => {
-    render(<App />);
     fireEvent.click(screen.getByRole('button', { name: `Play ${GAME_NAME}` }));
     expect(screen.getByRole('tablist')).toBeTruthy();
     expect(screen.queryByRole('grid')).toBeNull();
+  });
+
+  it('sends Play to Level select while Continue jumps straight into the Board', () => {
+    seedProgress({ starter: done(2) });
+    render(<App />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue Starter Level 3' }),
+    );
+    expect(screen.getByRole('grid')).toBeTruthy();
+    expect(
+      screen.getByRole('region', { name: 'Starter Level 3' }),
+    ).toBeTruthy();
   });
 
   it('resumes the earliest unfinished Level and never jumps past it', () => {
@@ -78,10 +86,15 @@ describe('Welcome routing (#15)', () => {
     ).toBeTruthy();
   });
 
-  it('shows Play alone when every Pack is complete: nothing left to resume', () => {
+  it('greys Continue when every Pack is complete: nothing left to resume', () => {
     seedProgress({ starter: done(10), classic: done(10), expert: done(10) });
     render(<App />);
-    expect(screen.queryByRole('button', { name: /Continue/ })).toBeNull();
+    const cont = screen.getByRole('button', {
+      name: 'Continue: everything complete',
+    });
+    expect((cont as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(cont);
+    expect(screen.queryByRole('grid')).toBeNull();
     expect(
       screen.getByRole('button', { name: `Play ${GAME_NAME}` }),
     ).toBeTruthy();
@@ -128,7 +141,7 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
     ).toBeTruthy();
   });
 
-  it('carries the settings toggles; the static hero needs no motion gating', () => {
+  it('carries the settings toggles; hero motion is CSS-only plus reduced-motion', () => {
     render(<App />);
     expect(
       screen.getByRole('checkbox', { name: 'Sound' }) as HTMLInputElement,
@@ -136,13 +149,15 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Win animation' }),
     ).toBeTruthy();
-    // Static hero by design: no animation class, so nothing to gate or
-    // reduce here; the win overlay keeps its own toggle + media query.
-    const hero = document.querySelector('.welcome-hero');
-    expect(hero?.className).not.toContain('animated');
 
+    // CSS-only rise, no toggle involved: the keyframes exist and
+    // prefers-reduced-motion disables the hero unconditionally.
     const css = read('src/App.css');
-    expect(css).not.toContain('welcome-animated');
+    expect(css).toMatch(/\.welcome-hero[\s\S]*animation: welcome-rise/);
+    expect(css).toMatch(/@keyframes welcome-rise/);
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.welcome-hero[\s\S]*animation: none/,
+    );
   });
 
   it('reads Pack entry in the rounded display face', () => {
@@ -152,25 +167,39 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
 });
 
 describe('Welcome type system and brand (#15)', () => {
+  const doc = () =>
+    new DOMParser().parseFromString(read('index.html'), 'text/html');
+
   it('preloads the self-hosted display face with a system fallback and no CDN fetch', () => {
-    const html = read('index.html');
-    // Document-relative, never root-absolute: holds under subpath hosting.
-    expect(html).toContain(`href="./${DISPLAY_FONT_FILE}"`);
-    expect(html).not.toContain('href="/fonts/');
-    expect(html).toMatch(/<link[^>]*rel="preload"[^>]*as="font"[^>]*>/);
-    expect(html).toMatch(/<link[^>]*type="font\/woff2"[^>]*crossorigin[^>]*>/);
+    // DOM-parsed shell: the preload link, icon, and manifest carry
+    // document-relative hrefs — never root-absolute — so subpath hosting
+    // holds without relying on build rebasing alone.
+    const head = doc().head;
+    const preload = head.querySelector(
+      'link[rel="preload"][as="font"][type="font/woff2"]',
+    );
+    expect(preload?.getAttribute('href')).toBe(`./${DISPLAY_FONT_FILE}`);
+    expect(preload?.hasAttribute('crossorigin')).toBe(true);
+    for (const href of [
+      head.querySelector('link[rel="icon"]')?.getAttribute('href'),
+      head.querySelector('link[rel="manifest"]')?.getAttribute('href'),
+      preload?.getAttribute('href'),
+    ]) {
+      expect(href).toBeTruthy();
+      expect(href?.startsWith('/')).toBe(false);
+    }
+    expect(doc().title).toBe(`${GAME_NAME} — Free Play pipe puzzle`);
     expect(existsSync(join(root, 'public', DISPLAY_FONT_FILE))).toBe(true);
 
+    // The face itself lives in the inline <style> so its URL resolves
+    // against the document, not a stylesheet directory.
+    const style = head.querySelector('style')?.textContent ?? '';
+    expect(style).toContain(`font-family: '${DISPLAY_FONT_FAMILY}'`);
+    expect(style).toContain(`url('./${DISPLAY_FONT_FILE}')`);
+    expect(style).toContain('font-display: swap');
+
     const css = read('src/index.css');
-    expect(css).toContain(`font-family: '${DISPLAY_FONT_FAMILY}'`);
-    // Root-absolute in CSS source on purpose: Vite rebases it against the
-    // relative base at build time (dist emits ../fonts/…, verified), while
-    // a document-relative URL would resolve against this file's directory.
-    expect(css).toContain(`url('/${DISPLAY_FONT_FILE}')`);
-    expect(css).toContain('font-display: swap');
-    // Top-level on purpose: nesting the face inside a color-scheme query
-    // would silently drop the display face in the other scheme.
-    expect(css.indexOf('@font-face')).toBeLessThan(css.indexOf('@media'));
+    expect(css).toContain(`'${DISPLAY_FONT_FAMILY}'`);
     expect(css).toMatch(/--heading:[\s\S]*system-ui/);
     // Offline guarantee: no runtime CDN font fetch anywhere in the shell.
     for (const file of ['index.html', 'src/index.css', 'src/App.css']) {

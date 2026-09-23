@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { PACK, PACKS, displayDifficulty, findPackById } from './pack';
+import {
+  PACK,
+  PACKS,
+  displayDifficulty,
+  findPackById,
+  packAriaLabel,
+} from './pack';
 import { PACK_PLAN, generatePack } from './generator';
 import { createInitialState, reducer } from './reducer';
 import { solveLevel } from './solver';
@@ -105,5 +111,14 @@ describe('Multi-Pack store (#12)', () => {
     expect(displayDifficulty('starter')).toBe('Starter');
     expect(displayDifficulty('classic')).toBe('Classic');
     expect(displayDifficulty('expert')).toBe('Expert');
+  });
+
+  it('builds the shared Pack accessible label (#15)', () => {
+    expect(packAriaLabel(PACKS[0], 0, 10)).toBe(
+      'Starter Pack, Starter Difficulty, 0 of 10 complete',
+    );
+    expect(packAriaLabel(PACKS[2], 7, 10)).toBe(
+      'Expert Pack, Expert Difficulty, 7 of 10 complete',
+    );
   });
 });
