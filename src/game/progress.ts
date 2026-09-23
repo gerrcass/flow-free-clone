@@ -209,32 +209,23 @@ export interface ContinueTarget {
 }
 
 /**
- * Continue target for the Welcome Screen (#15): resume the furthest Pack
- * with any completion at its first incomplete Level (unlocked by
- * construction), advancing past fully-complete Packs. A fresh player
- * starts at the first Level of the first Pack; a player who finished
- * everything points at the final Level. Returns null only with no Packs.
+ * Continue target for the Welcome Screen (#15): resume the earliest
+ * unfinished Level scanning Packs in order (sequential unlock makes it
+ * unlocked by construction), so progress in a later Pack never jumps
+ * ahead of an earlier unplayed Level. Returns null when every Level in
+ * every Pack is complete (nothing left to resume) or with no Packs.
  * Ragged progress arrays read as all-locked beyond their length.
  */
 export function findContinueTarget(
   progress: PackProgress,
   packs: PackLike[],
 ): ContinueTarget | null {
-  if (packs.length === 0) return null;
-  let furthest = -1;
-  packs.forEach((pack, i) => {
-    const done = packProgressCount(progress, pack.id).done;
-    if (done > 0) furthest = i;
-  });
-  const resumeFrom = furthest === -1 ? 0 : furthest;
-  for (let i = resumeFrom; i < packs.length; i++) {
-    const pack = packs[i];
+  for (const pack of packs) {
     const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
     const firstOpen = pack.levels.findIndex((_, level) => arr[level] !== true);
     if (firstOpen !== -1) return { packId: pack.id, index: firstOpen };
   }
-  const last = packs[packs.length - 1];
-  return { packId: last.id, index: last.levels.length - 1 };
+  return null;
 }
 
 export function createDefaultSettings(): Settings {

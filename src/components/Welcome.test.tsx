@@ -1,102 +1,155 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import App from '../App';
 import { PACKS } from '../game/pack';
-import { createDefaultSettings, emptyPackProgress } from '../game/progress';
+import {
+  PROGRESS_V2_KEY,
+  emptyPackProgress,
+  type PackProgress,
+} from '../game/progress';
 import { DISPLAY_FONT_FAMILY, DISPLAY_FONT_URL, GAME_NAME } from '../game/theme';
-import Welcome from './Welcome';
 
 const root = process.cwd();
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
-const noop = () => {};
 
-function welcomeHtml(progress = emptyPackProgress(PACKS)) {
-  return renderToStaticMarkup(
-    <Welcome
-      packs={PACKS}
-      progress={progress}
-      settings={createDefaultSettings()}
-      onSettingsChange={noop}
-      onPlay={noop}
-      onContinue={noop}
-      onEnterPack={noop}
-    />,
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
+
+function seedProgress(overrides: Partial<PackProgress>) {
+  const completed = { ...emptyPackProgress(PACKS), ...overrides };
+  localStorage.setItem(
+    PROGRESS_V2_KEY,
+    JSON.stringify({ version: 2, completed }),
   );
 }
 
+const done = (n: number, total = 10) =>
+  Array.from({ length: total }, (_, i) => i < n);
+
 describe('Welcome routing (#15)', () => {
   it('boots to the Welcome Screen, not Level select', () => {
-    const html = renderToStaticMarkup(<App />);
-    expect(html).toContain(`<h1>${GAME_NAME}</h1>`);
-    expect(html).toContain('aria-label="Mode"');
-    expect(html).toContain('aria-label="Packs"');
-    expect(html).not.toContain('role="tablist"');
+    render(<App />);
+    expect(screen.getByRole('heading', { name: GAME_NAME })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Mode' })).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Packs' })).toBeTruthy();
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 
-  it('shows Play for a fresh player and Continue resuming the highest unlocked Level', () => {
-    expect(welcomeHtml()).toContain(`aria-label="Play ${GAME_NAME}"`);
-    expect(welcomeHtml()).not.toContain('Continue:');
+  it('offers a fresh player both Continue into Starter Level 1 and Play to browse', () => {
+    render(<App />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue Starter Level 1' }),
+    );
+    expect(screen.getByRole('grid')).toBeTruthy();
+    expect(
+      screen.getByRole('region', { name: 'Starter Level 1' }),
+    ).toBeTruthy();
+  });
 
-    const progress = emptyPackProgress(PACKS);
-    progress.starter = [true, true, ...Array(8).fill(false)];
-    const returning = welcomeHtml(progress);
-    expect(returning).toContain('Continue: Starter Level 3');
-    expect(returning).toContain('aria-label="Continue Starter Level 3"');
+  it('sends Play to Level select while Continue jumps straight into the Board', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: `Play ${GAME_NAME}` }));
+    expect(screen.getByRole('tablist')).toBeTruthy();
+    expect(screen.queryByRole('grid')).toBeNull();
+  });
+
+  it('resumes the earliest unfinished Level and never jumps past it', () => {
+    seedProgress({ starter: done(2), classic: done(1) });
+    render(<App />);
+    const cont = screen.getByRole('button', { name: 'Continue Starter Level 3' });
+    fireEvent.click(cont);
+    expect(
+      screen.getByRole('region', { name: 'Starter Level 3' }),
+    ).toBeTruthy();
   });
 
   it('advances Continue past a fully-complete Pack', () => {
-    const progress = emptyPackProgress(PACKS);
-    progress.starter = Array(10).fill(true);
-    const html = welcomeHtml(progress);
-    expect(html).toContain('aria-label="Continue Classic Level 1"');
+    seedProgress({ starter: done(10) });
+    render(<App />);
+    expect(
+      screen.getByRole('button', { name: 'Continue Classic Level 1' }),
+    ).toBeTruthy();
+  });
+
+  it('shows Play alone when every Pack is complete: nothing left to resume', () => {
+    seedProgress({ starter: done(10), classic: done(10), expert: done(10) });
+    render(<App />);
+    expect(screen.queryByRole('button', { name: /Continue/ })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: `Play ${GAME_NAME}` }),
+    ).toBeTruthy();
   });
 });
 
 describe('Welcome Mode card and Pack entry (#15)', () => {
-  it('offers active Free Play and a disabled Time Trial with no logic', () => {
-    const html = welcomeHtml();
-    expect(html).toContain('aria-label="Free Play Mode, active, no timer"');
-    expect(html).toContain('aria-label="Time Trial Mode, coming in version 3"');
-    // Disabled in markup: no pointer path into Time Trial exists.
-    expect(html).toMatch(/<button[^>]*disabled[^>]*aria-label="Time Trial Mode/);
+  it('displays active Free Play and an inert, disabled Time Trial', () => {
+    render(<App />);
+    // Free Play is display copy, not navigation: no button behind it.
+    expect(screen.queryByRole('button', { name: /Free Play/ })).toBeNull();
+    expect(
+      screen.getByLabelText('Free Play Mode, active, no timer').textContent,
+    ).toContain('Free Play · active');
+
+    const trial = screen.getByRole('button', {
+      name: 'Time Trial Mode, coming in version 3',
+    });
+    expect(trial.textContent).toContain('coming in v3');
+    expect((trial as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(trial);
+    // No logic behind it: still on the Welcome Screen.
+    expect(screen.getByRole('heading', { name: GAME_NAME })).toBeTruthy();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('grid')).toBeNull();
   });
 
-  it('enters every Pack with Difficulty and progress in its label', () => {
-    const html = welcomeHtml();
+  it('enters every Pack with Difficulty and progress, landing on its tab', () => {
+    render(<App />);
     for (const pack of PACKS) {
-      expect(html).toContain(
-        `aria-label="${pack.name} Pack, ${pack.difficulty} Difficulty, 0 of 10 complete"`,
-      );
+      expect(
+        screen.getByRole('button', {
+          name: `${pack.name} Pack, ${pack.difficulty} Difficulty, 0 of 10 complete`,
+        }),
+      ).toBeTruthy();
     }
+    fireEvent.click(
+      screen.getByRole('button', { name: /Classic Pack, classic Difficulty/ }),
+    );
+    const tab = screen.getByRole('tab', { name: /Classic Pack/ });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(
+      screen.getByRole('tabpanel', { name: /Classic Pack/ }),
+    ).toBeTruthy();
   });
 
   it('carries the settings toggles and gates hero motion on the animation toggle', () => {
-    const html = welcomeHtml();
-    expect(html).toContain('<legend>Settings</legend>');
-    expect(html).toContain('Sound');
-    expect(html).toContain('Win animation');
-    expect(html).toContain('welcome-hero welcome-animated');
+    render(<App />);
+    expect(
+      screen.getByRole('checkbox', { name: 'Sound' }) as HTMLInputElement,
+    ).toHaveProperty('checked', true);
+    const hero = document.querySelector('.welcome-hero');
+    expect(hero?.className).toContain('welcome-animated');
 
-    const still = renderToStaticMarkup(
-      <Welcome
-        packs={PACKS}
-        progress={emptyPackProgress(PACKS)}
-        settings={{ sound: true, animation: false }}
-        onSettingsChange={noop}
-        onPlay={noop}
-        onContinue={noop}
-        onEnterPack={noop}
-      />,
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Animation' }));
+    expect(document.querySelector('.welcome-hero')?.className).not.toContain(
+      'welcome-animated',
     );
-    expect(still).toContain('class="welcome-hero"');
-    expect(still).not.toContain('welcome-animated');
 
     const css = read('src/App.css');
     expect(css).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.welcome-animated[\s\S]*animation: none/,
     );
+  });
+
+  it('reads Pack entry in the rounded display face', () => {
+    const css = read('src/App.css');
+    expect(css).toMatch(/\.welcome-packs button[\s\S]*font-family: var\(--heading\)/);
   });
 });
 
@@ -131,5 +184,13 @@ describe('Welcome type system and brand (#15)', () => {
     };
     expect(manifest.name).toContain(GAME_NAME);
     expect(manifest.short_name).toBe(GAME_NAME);
+  });
+
+  it('precaches the display face in the offline worker with subpath-safe paths', () => {
+    const sw = read('public/sw.js');
+    expect(sw).toContain('fonts/baloo-2-latin.woff2');
+    expect(sw).not.toContain('"/fonts/');
+    expect(sw).not.toContain('"/index.html"');
+    expect(read('vite.config.ts')).toContain("base: './'");
   });
 });

@@ -32,10 +32,9 @@ export default function Welcome({
   onContinue,
   onEnterPack,
 }: WelcomeProps) {
-  const hasProgress = packs.some(
-    (pack) => packProgressCount(progress, pack.id).done > 0,
-  );
-  const target = hasProgress ? findContinueTarget(progress, packs) : null;
+  // Earliest unfinished Level in Pack order, or null when everything is
+  // complete: then Play (browse/replay) is the only affordance.
+  const target = findContinueTarget(progress, packs);
   const targetPack = target ? findPackById(packs, target.packId) : undefined;
 
   return (
@@ -47,7 +46,7 @@ export default function Welcome({
         <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       </header>
 
-      {target && targetPack ? (
+      {target && targetPack && (
         <button
           type="button"
           onClick={() => onContinue(target.packId, target.index)}
@@ -55,21 +54,14 @@ export default function Welcome({
         >
           Continue: {targetPack.name} Level {target.index + 1}
         </button>
-      ) : (
-        <button type="button" onClick={onPlay} aria-label={`Play ${GAME_NAME}`}>
-          Play
-        </button>
       )}
+      <button type="button" onClick={onPlay} aria-label={`Play ${GAME_NAME}`}>
+        Play
+      </button>
 
       <section aria-label="Mode">
         <h2>Mode</h2>
-        <button
-          type="button"
-          onClick={onPlay}
-          aria-label="Free Play Mode, active, no timer"
-        >
-          Free Play · active
-        </button>
+        <p aria-label="Free Play Mode, active, no timer">Free Play · active</p>
         <button
           type="button"
           disabled

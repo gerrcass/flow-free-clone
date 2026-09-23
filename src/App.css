@@ -51,6 +51,13 @@
   margin: 0 0 16px;
 }
 
+/* Pack entry reads in the rounded display face; body copy and HUD stay on
+ * the system stack per the type system (#15, ADR 0006). */
+.welcome-packs button {
+  font-family: var(--heading);
+  font-weight: 600;
+}
+
 .welcome section {
   margin-bottom: 16px;
 }

@@ -161,13 +161,14 @@ describe('continue target (#15)', () => {
     });
   });
 
-  it('resumes the first incomplete Level within the furthest Pack with progress', () => {
+  it('resumes the first incomplete Level of the earliest unfinished Pack', () => {
     const packs = packsOf([3, 3]);
     const progress = emptyPackProgress(packs);
     progress['pack-0'] = [true, true, false];
     expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
+    // Progress in a later Pack never jumps ahead of an earlier unfinished one.
     progress['pack-1'] = [true, false, false];
-    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
   });
 
   it('advances to the next Pack once a Pack is fully complete', () => {
@@ -177,12 +178,12 @@ describe('continue target (#15)', () => {
     expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 0 });
   });
 
-  it('points at the final Level when every Pack is complete', () => {
+  it('returns null when every Pack is complete: nothing left to resume', () => {
     const packs = packsOf([2, 2]);
     const progress = emptyPackProgress(packs);
     progress['pack-0'] = [true, true];
     progress['pack-1'] = [true, true];
-    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+    expect(findContinueTarget(progress, packs)).toBeNull();
   });
 
   it('returns null with no Packs and tolerates ragged progress arrays', () => {

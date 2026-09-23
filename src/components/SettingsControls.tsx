@@ -18,13 +18,14 @@ export default function SettingsControls({ settings, onChange }: SettingsControl
         />{' '}
         Sound
       </label>
+      {/* App-wide motion toggle: win overlay pop/glow plus Welcome hero rise. */}
       <label>
         <input
           type="checkbox"
           checked={settings.animation}
           onChange={(e) => onChange({ ...settings, animation: e.target.checked })}
         />{' '}
-        Win animation
+        Animation
       </label>
     </fieldset>
   );
