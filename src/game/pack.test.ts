@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PACK, PACKS } from './pack';
+import { PACK, PACKS, findPackById } from './pack';
 import { PACK_PLAN, generatePack } from './generator';
 import { createInitialState, reducer } from './reducer';
 import { solveLevel } from './solver';
@@ -94,5 +94,10 @@ describe('Multi-Pack store (#12)', () => {
         pack.levels[pack.levels.length - 1].size,
       );
     }
+  });
+
+  it('finds a Pack by id, falling back to the first Pack (#15)', () => {
+    expect(findPackById(PACKS, 'classic')).toBe(PACKS[1]);
+    expect(findPackById(PACKS, 'unknown')).toBe(PACKS[0]);
   });
 });

@@ -3,8 +3,7 @@ import Board from './components/Board';
 import LevelSelect from './components/LevelSelect';
 import SettingsControls from './components/SettingsControls';
 import Welcome from './components/Welcome';
-import { PACKS } from './game/pack';
-import type { Pack } from './game/pack';
+import { PACKS, findPackById } from './game/pack';
 import {
   completeLevel,
   createDefaultSettings,
@@ -14,25 +13,16 @@ import {
   savePackProgress,
   saveSettings,
 } from './game/progress';
-import type { PackProgress, Settings } from './game/progress';
+import type { ContinueTarget, PackProgress, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
 import { fillRatio, isSolved } from './game/win';
 import './App.css';
 
-interface Selection {
-  packId: string;
-  index: number;
-}
-
 type Route =
   | { name: 'welcome' }
   | { name: 'select'; packId?: string }
-  | { name: 'level'; selection: Selection };
-
-function findPack(packId: string): Pack {
-  return PACKS.find((p) => p.id === packId) ?? PACKS[0];
-}
+  | { name: 'level'; selection: ContinueTarget };
 
 function PlayLevel({
   selection,
@@ -41,13 +31,13 @@ function PlayLevel({
   onExit,
   onNext,
 }: {
-  selection: Selection;
+  selection: ContinueTarget;
   settings: Settings;
   onWin: (packId: string, index: number) => void;
   onExit: () => void;
   onNext: () => void;
 }) {
-  const pack = findPack(selection.packId);
+  const pack = findPackById(PACKS, selection.packId);
   const levelNumber = selection.index + 1;
   const [state, dispatch] = useReducer(reducer, undefined, () =>
     createInitialState(pack.levels[selection.index]),
@@ -196,7 +186,7 @@ function App() {
             // Winning just completed `selection`, so the next Level in this
             // Pack is unlocked by construction; at the Pack end return to
             // select.
-            const pack = findPack(route.selection.packId);
+            const pack = findPackById(PACKS, route.selection.packId);
             setRoute(
               route.selection.index + 1 < pack.levels.length
                 ? {

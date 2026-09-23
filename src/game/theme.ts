@@ -10,7 +10,6 @@ export const GAME_NAME = 'Pipe Trails';
  */
 export const DISPLAY_FONT_FAMILY = 'Pipe Trails Display';
 export const DISPLAY_FONT_URL = '/fonts/baloo-2-latin.woff2';
-export const DISPLAY_FONT_WEIGHTS = '400 800';
 
 /**
  * Original 8-Color palette keyed by Pack Color id.

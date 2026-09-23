@@ -1,3 +1,16 @@
+/* Pipe Trails display face (#15, ADR 0006): Baloo 2 (SIL OFL 1.1) variable
+ * latin subset, self-hosted in public/fonts and preloaded from index.html.
+ * Top-level on purpose: the face must load in every color scheme.
+ * Headings and the wordmark use it; body and HUD stay on the system stack
+ * so text renders even if the face fails to load. No runtime CDN fetch. */
+@font-face {
+  font-family: 'Pipe Trails Display';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/baloo-2-latin.woff2') format('woff2');
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -33,18 +46,6 @@
 }
 
 @media (prefers-color-scheme: dark) {
-/* Pipe Trails display face (#15, ADR 0006): Baloo 2 (SIL OFL 1.1) variable
- * latin subset, self-hosted in public/fonts and preloaded from index.html.
- * Headings and the wordmark use it; body and HUD stay on the system stack
- * so text renders even if the face fails to load. No runtime CDN fetch. */
-@font-face {
-  font-family: 'Pipe Trails Display';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url('/fonts/baloo-2-latin.woff2') format('woff2');
-}
-
 :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;

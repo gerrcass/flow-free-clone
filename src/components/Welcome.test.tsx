@@ -112,6 +112,9 @@ describe('Welcome type system and brand (#15)', () => {
     expect(css).toContain(`font-family: '${DISPLAY_FONT_FAMILY}'`);
     expect(css).toContain(DISPLAY_FONT_URL);
     expect(css).toContain('font-display: swap');
+    // Top-level on purpose: nesting the face inside a color-scheme query
+    // would silently drop the display face in the other scheme.
+    expect(css.indexOf('@font-face')).toBeLessThan(css.indexOf('@media'));
     expect(css).toMatch(/--heading:[\s\S]*system-ui/);
     // Offline guarantee: no runtime CDN font fetch anywhere in the shell.
     for (const file of ['index.html', 'src/index.css', 'src/App.css']) {

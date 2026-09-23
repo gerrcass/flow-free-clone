@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { findPackById } from '../game/pack';
 import type { Pack } from '../game/pack';
 import {
   isUnlockedInPack,
@@ -22,7 +23,7 @@ export default function LevelSelect({
   const [activePackId, setActivePackId] = useState(
     initialPackId ?? packs[0]?.id ?? '',
   );
-  const active = packs.find((p) => p.id === activePackId) ?? packs[0];
+  const active = findPackById(packs, activePackId);
   if (!active) return null;
   const completed = progress[active.id] ?? [];
   const { done, total } = packProgressCount(progress, active.id);

@@ -1,3 +1,4 @@
+import { findPackById } from '../game/pack';
 import type { Pack } from '../game/pack';
 import { findContinueTarget, packProgressCount } from '../game/progress';
 import type { PackProgress, Settings } from '../game/progress';
@@ -13,10 +14,6 @@ interface WelcomeProps {
   onPlay: () => void;
   onContinue: (packId: string, index: number) => void;
   onEnterPack: (packId: string) => void;
-}
-
-function packById(packs: Pack[], packId: string): Pack | undefined {
-  return packs.find((p) => p.id === packId);
 }
 
 /**
@@ -39,7 +36,7 @@ export default function Welcome({
     (pack) => packProgressCount(progress, pack.id).done > 0,
   );
   const target = hasProgress ? findContinueTarget(progress, packs) : null;
-  const targetPack = target ? packById(packs, target.packId) : undefined;
+  const targetPack = target ? findPackById(packs, target.packId) : undefined;
 
   return (
     <div className="welcome">
