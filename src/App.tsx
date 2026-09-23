@@ -5,7 +5,7 @@ import LevelSelect from './components/LevelSelect';
 import SettingsControls from './components/SettingsControls';
 import Welcome from './components/Welcome';
 import WinOverlay from './components/WinOverlay';
-import { computePar, starsForLevel } from './game/challenge';
+import { computePar, starsForPar } from './game/challenge';
 import { PACKS, findPackById } from './game/pack';
 import {
   completeLevel,
@@ -52,18 +52,15 @@ function PlayLevel({
   );
   const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
   const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
-  // Solver-derived Par and stars for this Level (#14): one solver run per
-  // Level, memoized for the Level's lifetime (~ms on shipped Boards).
+  // Solver-derived Par and stars for this Level (#14): a single solver
+  // run per Level, memoized for the Level's lifetime (~ms on shipped
+  // Boards). PACKS is module-static, so pack id + index pin the Level.
   const par = useMemo(
     () => computePar(pack.levels[selection.index]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pack.id, selection.index],
   );
-  const available = useMemo(
-    () => starsForLevel(pack.levels[selection.index]),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pack.id, selection.index],
-  );
+  const available = par === null ? null : starsForPar(par);
   const hasNext = selection.index + 1 < pack.levels.length;
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
