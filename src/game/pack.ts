@@ -23,18 +23,19 @@ export function displayDifficulty(
   return (difficulty.charAt(0).toUpperCase() + difficulty.slice(1)) as Capitalize<Difficulty>;
 }
 
-/**
- * Shared Pack accessible label (#15): one shape for Pack entry buttons,
- * Pack tabs, and tabpanels instead of rebuilding the string per site.
- */
-export function packAriaLabel(pack: Pack, done: number, total: number): string {
-  return `${pack.name} Pack, ${displayDifficulty(pack.difficulty)} Difficulty, ${done} of ${total} complete`;
-}
-
 export interface PackSummary {
   done: number;
   total: number;
   difficulty: Capitalize<Difficulty>;
+}
+
+/**
+ * Shared Pack accessible label (#15): one shape for Pack entry buttons,
+ * Pack tabs, and tabpanels. Takes the PackSummary bundle instead of three
+ * loose numbers travelling together.
+ */
+export function packAriaLabel(pack: Pack, summary: PackSummary): string {
+  return `${pack.name} Pack, ${summary.difficulty} Difficulty, ${summary.done} of ${summary.total} complete`;
 }
 
 /**

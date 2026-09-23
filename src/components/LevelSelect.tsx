@@ -22,7 +22,7 @@ export default function LevelSelect({
   const active = findPackById(packs, activePackId);
   if (!active) return null;
   const completed = progress[active.id] ?? [];
-  const { done, total, difficulty } = describePack(progress, active);
+  const summary = describePack(progress, active);
 
   return (
     <div className="level-select">
@@ -36,7 +36,7 @@ export default function LevelSelect({
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-label={packAriaLabel(pack, summary.done, summary.total)}
+              aria-label={packAriaLabel(pack, summary)}
               onClick={() => setActivePackId(pack.id)}
             >
               {pack.name} · {summary.difficulty} Difficulty · {summary.done}/
@@ -45,13 +45,15 @@ export default function LevelSelect({
           );
         })}
       </div>
-      <section role="tabpanel" aria-label={packAriaLabel(active, done, total)}>
+      <section role="tabpanel" aria-label={packAriaLabel(active, summary)}>
         <h2>
           {active.name}{' '}
-          <span aria-label={`${difficulty} Difficulty`}>· {difficulty}</span>
+          <span aria-label={`${summary.difficulty} Difficulty`}>
+            · {summary.difficulty}
+          </span>
         </h2>
         <p aria-live="polite">
-          {done} of {total} complete
+          {summary.done} of {summary.total} complete
         </p>
         <ol className="level-grid">
           {active.levels.map((_, index) => {

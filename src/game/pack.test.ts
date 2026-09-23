@@ -114,13 +114,13 @@ describe('Multi-Pack store (#12)', () => {
     expect(displayDifficulty('expert')).toBe('Expert');
   });
 
-  it('builds the shared Pack accessible label (#15)', () => {
-    expect(packAriaLabel(PACKS[0], 0, 10)).toBe(
-      'Starter Pack, Starter Difficulty, 0 of 10 complete',
-    );
-    expect(packAriaLabel(PACKS[2], 7, 10)).toBe(
-      'Expert Pack, Expert Difficulty, 7 of 10 complete',
-    );
+  it('builds the shared Pack accessible label from its summary bundle (#15)', () => {
+    expect(
+      packAriaLabel(PACKS[0], { done: 0, total: 10, difficulty: 'Starter' }),
+    ).toBe('Starter Pack, Starter Difficulty, 0 of 10 complete');
+    expect(
+      packAriaLabel(PACKS[2], { done: 7, total: 10, difficulty: 'Expert' }),
+    ).toBe('Expert Pack, Expert Difficulty, 7 of 10 complete');
   });
 
   it('describes a Pack with progress and display Difficulty in one shape (#15)', () => {

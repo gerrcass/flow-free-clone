@@ -27,6 +27,30 @@ function appStyleSheet(): CSSStyleSheet {
   return sheet;
 }
 
+/** One style rule from a rule list, hiding the cssRules walk. */
+function findStyleRule(
+  rules: ArrayLike<CSSRule>,
+  selector: string,
+): CSSStyleRule | undefined {
+  return Array.from(rules).find(
+    (candidate) =>
+      candidate.type === CSSRule.STYLE_RULE &&
+      (candidate as CSSStyleRule).selectorText === selector,
+  ) as CSSStyleRule | undefined;
+}
+
+/** One @media block from a stylesheet, hiding the cssRules walk. */
+function findMediaRule(
+  sheet: CSSStyleSheet,
+  query: string,
+): CSSMediaRule | undefined {
+  return Array.from(sheet.cssRules).find(
+    (candidate) =>
+      candidate.type === CSSRule.MEDIA_RULE &&
+      (candidate as CSSMediaRule).media.mediaText.includes(query),
+  ) as CSSMediaRule | undefined;
+}
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -174,37 +198,19 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
           (text.includes('@keyframes') || text.includes('translateY')),
       ),
     ).toBe(true);
-    const reduced = Array.from(sheet.cssRules).find(
-      (rule) =>
-        rule.type === CSSRule.MEDIA_RULE &&
-        (rule as CSSMediaRule).media.mediaText.includes(
-          'prefers-reduced-motion',
-        ),
-    ) as CSSMediaRule | undefined;
-    expect(reduced).toBeTruthy();
-    const heroRule = Array.from(reduced?.cssRules ?? []).find(
-      (rule) =>
-        rule.type === CSSRule.STYLE_RULE &&
-        (rule as CSSStyleRule).selectorText.includes('.welcome-hero'),
-    ) as CSSStyleRule | undefined;
+    const reduced = findMediaRule(sheet, 'prefers-reduced-motion');
+    const heroRule = reduced && findStyleRule(reduced.cssRules, '.welcome-hero');
     expect(heroRule?.style.getPropertyValue('animation')).toContain('none');
   });
 
   it('reads Pack entry in the rounded display face', () => {
-    const sheet = appStyleSheet();
-    const packRule = Array.from(sheet.cssRules).find(
-      (rule) =>
-        rule.type === CSSRule.STYLE_RULE &&
-        (rule as CSSStyleRule).selectorText === '.welcome-packs button',
-    ) as CSSStyleRule | undefined;
-    expect(
-      packRule?.style.getPropertyValue('font-family'),
-    ).toContain('var(--heading)');
-  });
-
-  it('reads Pack entry in the rounded display face', () => {
-    const css = readFile('src/App.css');
-    expect(css).toMatch(/\.welcome-packs button[\s\S]*font-family: var\(--heading\)/);
+    const packRule = findStyleRule(
+      appStyleSheet().cssRules,
+      '.welcome-packs button',
+    );
+    expect(packRule?.style.getPropertyValue('font-family')).toContain(
+      'var(--heading)',
+    );
   });
 });
 
@@ -247,6 +253,47 @@ describe('Welcome type system and brand (#15)', () => {
     for (const file of ['index.html', 'src/index.css', 'src/App.css']) {
       expect(readFile(file)).not.toMatch(/fonts\.googleapis\.com|fonts\.gstatic\.com/);
     }
+  });
+
+  it('renders the wordmark through the display stack to the self-hosted face', () => {
+    // Global cascade applied: the rendered H1 must resolve its face
+    // through var(--heading), whose definition starts with the display
+    // family, whose @font-face rule points at the vendored file.
+    const global = document.createElement('style');
+    global.textContent = readFile('src/index.css');
+    document.head.appendChild(global);
+    render(<App />);
+    const wordmark = screen.getByRole('heading', { name: GAME_NAME });
+    expect(wordmark.tagName).toBe('H1');
+    expect(
+      getComputedStyle(wordmark).getPropertyValue('font-family'),
+    ).toContain('var(--heading)');
+
+    const rootRule = findStyleRule(
+      (global.sheet as CSSStyleSheet).cssRules,
+      ':root',
+    );
+    const heading = rootRule?.style.getPropertyValue('--heading') ?? '';
+    expect(heading).toContain(DISPLAY_FONT_FAMILY);
+    expect(heading).toContain('system-ui');
+
+    const faceText =
+      shellDoc().head.querySelector('style')?.textContent ?? '';
+    const faceStyle = document.createElement('style');
+    faceStyle.textContent = faceText;
+    document.head.appendChild(faceStyle);
+    const faceRule = Array.from(
+      (faceStyle.sheet as CSSStyleSheet).cssRules,
+    ).find((rule) => rule.type === CSSRule.FONT_FACE_RULE) as
+      | CSSFontFaceRule
+      | undefined;
+    expect(faceRule?.style.getPropertyValue('font-family')).toContain(
+      DISPLAY_FONT_FAMILY,
+    );
+    // jsdom drops @font-face src entirely (its cssText keeps only family
+    // + style), so the file pin reads the parsed style element's text —
+    // still the shipped document, not a raw file grep.
+    expect(faceText).toContain(`url('./${DISPLAY_FONT_FILE}')`);
   });
 
   it('carries the Pipe Trails wordmark through title and manifest', () => {

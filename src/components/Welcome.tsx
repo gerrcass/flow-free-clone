@@ -38,7 +38,7 @@ export default function Welcome({
   // while Play is always the way forward.
   const target = findContinueTarget(progress, packs);
   const targetPack = target ? findPackById(packs, target.packId) : undefined;
-  const complete =
+  const allPacksComplete =
     packs.length > 0 &&
     packs.every(
       (pack) => describePack(progress, pack).done === pack.levels.length,
@@ -66,7 +66,7 @@ export default function Welcome({
           type="button"
           disabled
           aria-label={
-            complete
+            allPacksComplete
               ? 'Continue: everything complete'
               : 'Continue: no saved progress yet'
           }
@@ -94,15 +94,16 @@ export default function Welcome({
         <h2>Packs</h2>
         <ul className="welcome-packs">
           {packs.map((pack) => {
-            const { done, total, difficulty } = describePack(progress, pack);
+            const summary = describePack(progress, pack);
             return (
               <li key={pack.id}>
                 <button
                   type="button"
                   onClick={() => onEnterPack(pack.id)}
-                  aria-label={packAriaLabel(pack, done, total)}
+                  aria-label={packAriaLabel(pack, summary)}
                 >
-                  {pack.name} · {difficulty} · {done}/{total}
+                  {pack.name} · {summary.difficulty} · {summary.done}/
+                  {summary.total}
                 </button>
               </li>
             );
