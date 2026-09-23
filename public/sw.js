@@ -1,14 +1,15 @@
-/* Hue Trails offline worker (Free Play story 14).
+/* Pipe Trails offline worker (Free Play story 14).
  * Cache-first app shell: after first load the Pack is playable offline.
  * Keep the precache list small and versioned; bump CACHE on shell changes.
  */
-const CACHE = 'hue-trails-v1';
+const CACHE = 'pipe-trails-v1';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/favicon.svg',
   '/icons.svg',
+  '/fonts/baloo-2-latin.woff2',
 ];
 
 self.addEventListener('install', (event) => {

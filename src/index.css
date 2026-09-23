@@ -12,7 +12,9 @@
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading:
+    'Pipe Trails Display', ui-rounded, 'SF Pro Rounded', system-ui, 'Segoe UI',
+    Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
@@ -31,7 +33,19 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+/* Pipe Trails display face (#15, ADR 0006): Baloo 2 (SIL OFL 1.1) variable
+ * latin subset, self-hosted in public/fonts and preloaded from index.html.
+ * Headings and the wordmark use it; body and HUD stay on the system stack
+ * so text renders even if the face fails to load. No runtime CDN fetch. */
+@font-face {
+  font-family: 'Pipe Trails Display';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/baloo-2-latin.woff2') format('woff2');
+}
+
+:root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
     --bg: #16171d;

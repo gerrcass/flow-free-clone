@@ -6,6 +6,7 @@ import {
   completeLevel,
   createDefaultSettings,
   emptyPackProgress,
+  findContinueTarget,
   groupBySize,
   isUnlocked,
   isUnlockedInPack,
@@ -145,6 +146,53 @@ describe('per-Pack unlock (#12)', () => {
     expect(packProgressCount(progress, 'classic')).toEqual({ done: 0, total: 1 });
     expect(packProgressCount(progress, 'expert')).toEqual({ done: 0, total: 0 });
     expect(packProgressCount(progress, 'unknown')).toEqual({ done: 0, total: 0 });
+  });
+});
+
+describe('continue target (#15)', () => {
+  const packsOf = (sizes: number[]) =>
+    sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
+
+  it('starts a fresh player at the first Level of the first Pack', () => {
+    const packs = packsOf([3, 2]);
+    expect(findContinueTarget(emptyPackProgress(packs), packs)).toEqual({
+      packId: 'pack-0',
+      index: 0,
+    });
+  });
+
+  it('resumes the first incomplete Level within the furthest Pack with progress', () => {
+    const packs = packsOf([3, 3]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true, false];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
+    progress['pack-1'] = [true, false, false];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+  });
+
+  it('advances to the next Pack once a Pack is fully complete', () => {
+    const packs = packsOf([2, 2]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 0 });
+  });
+
+  it('points at the final Level when every Pack is complete', () => {
+    const packs = packsOf([2, 2]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true];
+    progress['pack-1'] = [true, true];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+  });
+
+  it('returns null with no Packs and tolerates ragged progress arrays', () => {
+    expect(findContinueTarget({}, [])).toBeNull();
+    const packs = packsOf([3]);
+    expect(findContinueTarget({}, packs)).toEqual({ packId: 'pack-0', index: 0 });
+    expect(findContinueTarget({ 'pack-0': [true] }, packs)).toEqual({
+      packId: 'pack-0',
+      index: 1,
+    });
   });
 });
 

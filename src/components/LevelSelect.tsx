@@ -9,11 +9,19 @@ import {
 interface LevelSelectProps {
   packs: Pack[];
   progress: PackProgress;
+  initialPackId?: string;
   onSelect: (packId: string, index: number) => void;
 }
 
-export default function LevelSelect({ packs, progress, onSelect }: LevelSelectProps) {
-  const [activePackId, setActivePackId] = useState(packs[0]?.id ?? '');
+export default function LevelSelect({
+  packs,
+  progress,
+  initialPackId,
+  onSelect,
+}: LevelSelectProps) {
+  const [activePackId, setActivePackId] = useState(
+    initialPackId ?? packs[0]?.id ?? '',
+  );
   const active = packs.find((p) => p.id === activePackId) ?? packs[0];
   if (!active) return null;
   const completed = progress[active.id] ?? [];
