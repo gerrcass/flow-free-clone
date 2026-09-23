@@ -209,12 +209,32 @@ export interface ContinueTarget {
 }
 
 /**
+ * Normalized per-Pack completion (#15): ragged or missing stores read as
+ * all-locked beyond their length, so every scan below shares one guard.
+ */
+function packCompletion(
+  progress: PackProgress,
+  packId: string,
+  total: number,
+): boolean[] {
+  const arr = Array.isArray(progress[packId]) ? progress[packId] : [];
+  return Array.from({ length: total }, (_, i) => arr[i] === true);
+}
+
+/** First incomplete Level in a normalized array, or -1 when complete. */
+function firstIncomplete(normalized: boolean[]): number {
+  return normalized.findIndex((c) => c !== true);
+}
+
+/**
  * Continue target for the Welcome Screen (#15): resume the highest
  * unlocked Pack/Level — the furthest Pack with any completion, at its
- * first incomplete Level (unlocked by construction), advancing past
- * fully-complete Packs. Returns null when nothing is resumable: a fresh
- * player with no progress, every Pack complete, or no Packs at all.
- * Ragged progress arrays read as all-locked beyond their length.
+ * first incomplete Level, advancing past fully-complete Packs. The
+ * returned Level is always reached through sequential unlock
+ * (isUnlockedInPack): every earlier Level in its Pack is complete by
+ * construction of first-incomplete, checked explicitly below. Returns
+ * null when nothing is resumable: a fresh player with no progress,
+ * every Pack complete, or no Packs at all.
  */
 export function findContinueTarget(
   progress: PackProgress,
@@ -227,9 +247,11 @@ export function findContinueTarget(
   if (furthest === -1) return null;
   for (let i = furthest; i < packs.length; i++) {
     const pack = packs[i];
-    const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
-    const firstOpen = pack.levels.findIndex((_, level) => arr[level] !== true);
-    if (firstOpen !== -1) return { packId: pack.id, index: firstOpen };
+    const normalized = packCompletion(progress, pack.id, pack.levels.length);
+    const firstOpen = firstIncomplete(normalized);
+    if (firstOpen !== -1 && isUnlockedInPack(normalized, firstOpen)) {
+      return { packId: pack.id, index: firstOpen };
+    }
   }
   return null;
 }
@@ -237,7 +259,7 @@ export function findContinueTarget(
 /**
  * Single source for "every Pack complete" (#15): the greyed-Continue
  * reason in Welcome reuses the same predicate instead of re-deriving it
- * from per-Pack counts. Ragged arrays read as incomplete beyond length.
+ * from per-Pack counts. Shares the normalized-completion helper above.
  */
 export function areAllPacksComplete(
   progress: PackProgress,
@@ -245,11 +267,8 @@ export function areAllPacksComplete(
 ): boolean {
   if (packs.length === 0) return false;
   return packs.every((pack) => {
-    const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
-    return (
-      pack.levels.length > 0 &&
-      pack.levels.every((_, level) => arr[level] === true)
-    );
+    if (pack.levels.length === 0) return false;
+    return firstIncomplete(packCompletion(progress, pack.id, pack.levels.length)) === -1;
   });
 }
 

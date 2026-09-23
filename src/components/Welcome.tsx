@@ -79,7 +79,18 @@ export default function Welcome({
 
       <section aria-label="Mode">
         <h2>Mode</h2>
-        <p aria-label="Free Play Mode, active, no timer">Free Play · active</p>
+        {/* Parallel disabled options (#15): Free Play is the current Mode
+          (disabled because there is nowhere to switch), Time Trial is
+          reserved for v3. Same control shape so screen readers meet two
+          options, not text plus a control; neither carries logic. */}
+        <button
+          type="button"
+          disabled
+          aria-current="true"
+          aria-label="Free Play Mode, active, no timer"
+        >
+          Free Play · active
+        </button>
         <button
           type="button"
           disabled

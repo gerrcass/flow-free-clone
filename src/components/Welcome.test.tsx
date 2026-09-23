@@ -27,16 +27,25 @@ function appStyleSheet(): CSSStyleSheet {
   return sheet;
 }
 
+/** One rule from a rule list, hiding the cssRules walk. */
+function findRule<T extends CSSRule>(
+  rules: ArrayLike<CSSRule>,
+  predicate: (candidate: CSSRule) => candidate is T,
+): T | undefined {
+  return Array.from(rules).find(predicate);
+}
+
 /** One style rule from a rule list, hiding the cssRules walk. */
 function findStyleRule(
   rules: ArrayLike<CSSRule>,
   selector: string,
 ): CSSStyleRule | undefined {
-  return Array.from(rules).find(
-    (candidate) =>
+  return findRule<CSSStyleRule>(
+    rules,
+    (candidate): candidate is CSSStyleRule =>
       candidate.type === CSSRule.STYLE_RULE &&
       (candidate as CSSStyleRule).selectorText === selector,
-  ) as CSSStyleRule | undefined;
+  );
 }
 
 /** One @media block from a stylesheet, hiding the cssRules walk. */
@@ -44,11 +53,12 @@ function findMediaRule(
   sheet: CSSStyleSheet,
   query: string,
 ): CSSMediaRule | undefined {
-  return Array.from(sheet.cssRules).find(
-    (candidate) =>
+  return findRule<CSSMediaRule>(
+    sheet.cssRules,
+    (candidate): candidate is CSSMediaRule =>
       candidate.type === CSSRule.MEDIA_RULE &&
       (candidate as CSSMediaRule).media.mediaText.includes(query),
-  ) as CSSMediaRule | undefined;
+  );
 }
 
 afterEach(() => {
@@ -140,11 +150,15 @@ describe('Welcome routing (#15)', () => {
 describe('Welcome Mode card and Pack entry (#15)', () => {
   it('displays active Free Play and an inert, disabled Time Trial', () => {
     render(<App />);
-    // Free Play is display copy, not navigation: no button behind it.
-    expect(screen.queryByRole('button', { name: /Free Play/ })).toBeNull();
-    expect(
-      screen.getByLabelText('Free Play Mode, active, no timer').textContent,
-    ).toContain('Free Play · active');
+    // Parallel Mode options: both disabled buttons, neither navigates.
+    const freePlay = screen.getByRole('button', {
+      name: 'Free Play Mode, active, no timer',
+    });
+    expect(freePlay.textContent).toContain('Free Play · active');
+    expect((freePlay as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(freePlay);
+    expect(screen.getByRole('heading', { name: GAME_NAME })).toBeTruthy();
+    expect(screen.queryByRole('tablist')).toBeNull();
 
     const trial = screen.getByRole('button', {
       name: 'Time Trial Mode, coming in version 3',
