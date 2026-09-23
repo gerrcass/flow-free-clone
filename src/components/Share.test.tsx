@@ -4,9 +4,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { FIXTURE_LEVEL } from '../game/fixture';
+import { FIXTURE_LEVEL, UNSOLVABLE_LEVEL } from '../game/fixture';
 import { PACKS } from '../game/pack';
-import type { Level } from '../game/types';
 import {
   emptyPackProgress,
   emptyPackStars,
@@ -54,14 +53,7 @@ describe('share-via-URL in the App shell (#16)', () => {
   });
 
   it('rejects a structurally valid but unsolvable shared Board', () => {
-    const unsolvable: Level = {
-      size: 2,
-      colors: [
-        { id: 'R', endpoints: [{ row: 0, col: 0 }, { row: 1, col: 1 }] },
-        { id: 'G', endpoints: [{ row: 0, col: 1 }, { row: 1, col: 0 }] },
-      ],
-    };
-    openAppWithHash(buildShareHash(unsolvable));
+    openAppWithHash(buildShareHash(UNSOLVABLE_LEVEL));
     expect(screen.getByText(/invalid or unsolvable/i)).toBeTruthy();
     expect(screen.queryByRole('grid')).toBeNull();
   });
@@ -121,6 +113,20 @@ describe('share-via-URL in the App shell (#16)', () => {
     const url = await copyShareLink(FIXTURE_LEVEL);
     expect(url).toContain('#level=');
   });
+
+  it('loads the shared Board with the network disabled (offline after first load)', () => {
+    // The shell is already cached at this point; proving the shared route
+    // itself needs no network: every fetch throws, yet the verified Board
+    // still renders.
+    vi.stubGlobal('fetch', () => {
+      throw new Error('offline');
+    });
+    openAppWithHash(buildShareHash(FIXTURE_LEVEL));
+    expect(screen.getByRole('grid')).toBeTruthy();
+    expect(
+      screen.getByRole('region', { name: 'Shared Level' }),
+    ).toBeTruthy();
+  });
 });
 
 describe('shared Levels leave the persisted store alone (#16)', () => {
@@ -142,5 +148,15 @@ describe('shared Levels leave the persisted store alone (#16)', () => {
       emptyPackProgress(PACKS),
     );
     expect(loadPackStars(localStorage, PACKS)).toEqual(emptyPackStars(PACKS));
+  });
+
+  it('reset clears the share hash and the invalid-link banner', () => {
+    openAppWithHash('#level=!!!');
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(window.location.hash).toBe('#level=!!!');
+    fireEvent.click(screen.getByRole('button', { name: `Play ${GAME_NAME}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset progress' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(window.location.hash).toBe('');
   });
 });

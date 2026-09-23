@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIXTURE_LEVEL } from './fixture';
+import { FIXTURE_LEVEL, UNSOLVABLE_LEVEL } from './fixture';
 import { PACK } from './pack';
 import {
   buildShareHash,
@@ -81,14 +81,6 @@ describe('invalid-link handling (#16)', () => {
 });
 
 describe('solver verification on load (#16)', () => {
-  const unsolvable: Level = {
-    size: 2,
-    colors: [
-      { id: 'R', endpoints: [{ row: 0, col: 0 }, { row: 1, col: 1 }] },
-      { id: 'G', endpoints: [{ row: 0, col: 1 }, { row: 1, col: 0 }] },
-    ],
-  };
-
   it('loads a solvable shared Board', () => {
     expect(loadSharedLevelFromHash(buildShareHash(FIXTURE_LEVEL))).toEqual(
       FIXTURE_LEVEL,
@@ -97,9 +89,25 @@ describe('solver verification on load (#16)', () => {
 
   it('rejects a structurally valid but unsolvable shared Board', () => {
     // Passes structural decode but fails the Solver seam.
-    expect(parseShareHash(buildShareHash(unsolvable))).toEqual(unsolvable);
-    expect(loadSharedLevelFromHash(buildShareHash(unsolvable))).toBeNull();
+    expect(parseShareHash(buildShareHash(UNSOLVABLE_LEVEL))).toEqual(
+      UNSOLVABLE_LEVEL,
+    );
+    expect(loadSharedLevelFromHash(buildShareHash(UNSOLVABLE_LEVEL))).toBeNull();
   });
+
+  it(
+    'verifies every shipped Pack Level through the share path, densest last',
+    { timeout: 120_000 },
+    () => {
+      // Conformance for the structural gate and the budgeted Solver seam:
+      // every shipped Board (up to 8x8, 8 Colors) satisfies the ID,
+      // bounds, and distinct-Cell rules and completes within budget.
+      for (const level of PACK) {
+        expect(parseShareHash(buildShareHash(level))).toEqual(level);
+        expect(loadSharedLevelFromHash(buildShareHash(level))).toEqual(level);
+      }
+    },
+  );
 
   it('rejects garbage hashes without running the solver', () => {
     expect(loadSharedLevelFromHash('#level=!!!')).toBeNull();

@@ -168,22 +168,15 @@ export async function copyShareLink(level: Level): Promise<string> {
   return url;
 }
 
-export interface VerifyOptions {
-  /** Injectable solver; defaults to the shipped Solver seam. */
-  solve?: (level: Level) => unknown;
-}
-
 /**
  * Load a shared Board from a location hash (#16): structural decode plus
  * Solver-seam verification that the Board is completable. Returns the
  * identical Board, or null for invalid links and unsolvable Boards.
+ * Verification shares the solver's step budget: pathological Boards past
+ * the budget read as unsolvable, the same limit the Pack tools accept.
  */
-export function loadSharedLevelFromHash(
-  hash: string,
-  options: VerifyOptions = {},
-): Level | null {
+export function loadSharedLevelFromHash(hash: string): Level | null {
   const level = parseShareHash(hash);
   if (level === null) return null;
-  const solve = options.solve ?? solveLevel;
-  return solve(level) === null ? null : level;
+  return solveLevel(level) === null ? null : level;
 }

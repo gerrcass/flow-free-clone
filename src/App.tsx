@@ -201,8 +201,18 @@ function readSettings() {
   return loadSettings(localStorage);
 }
 
+/**
+ * One bundle for the share fragment read (#16): the route plus whether
+ * the fragment was a bad share link. Both travel together from the single
+ * mount-time parse into the hashchange handler below.
+ */
+interface HashRoute {
+  route: Route;
+  invalid: boolean;
+}
+
 /** Read the current location hash as a shared Level route (#16). */
-function readSharedRoute(): { route: Route; invalid: boolean } {
+function readSharedRoute(): HashRoute {
   try {
     const hash = window.location.hash;
     if (!hash.startsWith(SHARE_HASH_PREFIX)) return { route: { name: 'welcome' }, invalid: false };
@@ -210,7 +220,10 @@ function readSharedRoute(): { route: Route; invalid: boolean } {
     if (level === null) return { route: { name: 'welcome' }, invalid: true };
     return { route: { name: 'shared', level }, invalid: false };
   } catch {
-    return { route: { name: 'welcome' }, invalid: false };
+    // A throwing read means the fragment claimed to be a share link but
+    // could not be verified: surface the invalid-link alert, never a
+    // silent Welcome.
+    return { route: { name: 'welcome' }, invalid: true };
   }
 }
 
@@ -226,12 +239,12 @@ function clearShareHash(): void {
 function App() {
   // One hash parse per mount: the Solver-seam verify inside is the
   // expensive part, so route and invalid flag share a single read.
-  const [initial] = useState<{ route: Route; invalid: boolean }>(() => {
+  const [initialRoute] = useState<HashRoute>(() => {
     if (typeof window === 'undefined') return { route: { name: 'welcome' }, invalid: false };
     return readSharedRoute();
   });
-  const [route, setRoute] = useState<Route>(initial.route);
-  const [sharedInvalid, setSharedInvalid] = useState(initial.invalid);
+  const [route, setRoute] = useState<Route>(initialRoute.route);
+  const [sharedInvalid, setSharedInvalid] = useState(initialRoute.invalid);
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
