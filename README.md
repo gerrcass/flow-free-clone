@@ -1,4 +1,4 @@
-# Hue Trails — Free Play pipe puzzle
+# Pipe Trails — Free Play pipe puzzle
 
 A relaxed, free, Flow Free-style puzzle game for the web. Connect each
 Color's two Endpoints with a Pipe and fill every Cell of the Board — no

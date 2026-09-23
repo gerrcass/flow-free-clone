@@ -3,9 +3,11 @@ import {
   PROGRESS_KEY,
   PROGRESS_V2_KEY,
   SETTINGS_KEY,
+  areAllPacksComplete,
   completeLevel,
   createDefaultSettings,
   emptyPackProgress,
+  findContinueTarget,
   groupBySize,
   isUnlocked,
   isUnlockedInPack,
@@ -145,6 +147,75 @@ describe('per-Pack unlock (#12)', () => {
     expect(packProgressCount(progress, 'classic')).toEqual({ done: 0, total: 1 });
     expect(packProgressCount(progress, 'expert')).toEqual({ done: 0, total: 0 });
     expect(packProgressCount(progress, 'unknown')).toEqual({ done: 0, total: 0 });
+  });
+});
+describe('continue target (#15)', () => {
+  const packsOf = (sizes: number[]) =>
+    sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
+
+  it('returns null for a fresh player: nothing resumable yet', () => {
+    const packs = packsOf([3, 2]);
+    expect(findContinueTarget(emptyPackProgress(packs), packs)).toBeNull();
+  });
+
+  it('resumes the first incomplete Level of a partially played Pack', () => {
+    const packs = packsOf([3, 3]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true, false];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
+  });
+
+  it('resumes the highest unlocked Pack/Level: furthest Pack with progress wins', () => {
+    const packs = packsOf([3, 3]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, false, false];
+    progress['pack-1'] = [true, false, false];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+  });
+
+  it('advances past fully-complete Packs to the next Pack', () => {
+    const packs = packsOf([2, 2]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 0 });
+  });
+
+  it('returns null when every Pack is complete: nothing left to resume', () => {
+    const packs = packsOf([2, 2]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, true];
+    progress['pack-1'] = [true, true];
+    expect(findContinueTarget(progress, packs)).toBeNull();
+  });
+
+  it('returns null with no Packs and tolerates ragged progress arrays', () => {
+    expect(findContinueTarget({}, [])).toBeNull();
+    const packs = packsOf([3]);
+    expect(findContinueTarget({}, packs)).toBeNull();
+    expect(findContinueTarget({ 'pack-0': [true] }, packs)).toEqual({
+      packId: 'pack-0',
+      index: 1,
+    });
+  });
+});
+
+describe('all packs complete (#15)', () => {
+  const packsOf = (sizes: number[]) =>
+    sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
+
+  it('is false for a fresh player and true when every Pack is complete', () => {
+    const packs = packsOf([2, 2]);
+    expect(areAllPacksComplete(emptyPackProgress(packs), packs)).toBe(false);
+    expect(
+      areAllPacksComplete({ 'pack-0': [true, true], 'pack-1': [true, true] }, packs),
+    ).toBe(true);
+  });
+
+  it('is false with no Packs and reads ragged arrays as incomplete', () => {
+    expect(areAllPacksComplete({}, [])).toBe(false);
+    const packs = packsOf([3]);
+    expect(areAllPacksComplete({}, packs)).toBe(false);
+    expect(areAllPacksComplete({ 'pack-0': [true] }, packs)).toBe(false);
   });
 });
 

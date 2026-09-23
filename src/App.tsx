@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Board from './components/Board';
 import LevelSelect from './components/LevelSelect';
-import { PACKS } from './game/pack';
-import type { Pack } from './game/pack';
+import SettingsControls from './components/SettingsControls';
+import Welcome from './components/Welcome';
+import { PACKS, findPackById } from './game/pack';
 import {
   completeLevel,
   createDefaultSettings,
@@ -12,21 +13,16 @@ import {
   savePackProgress,
   saveSettings,
 } from './game/progress';
-import type { PackProgress, Settings } from './game/progress';
+import type { ContinueTarget, PackProgress, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
-import { GAME_NAME } from './game/theme';
 import { fillRatio, isSolved } from './game/win';
 import './App.css';
 
-interface Selection {
-  packId: string;
-  index: number;
-}
-
-function findPack(packId: string): Pack {
-  return PACKS.find((p) => p.id === packId) ?? PACKS[0];
-}
+type Route =
+  | { name: 'welcome' }
+  | { name: 'level-select'; packId?: string }
+  | { name: 'level'; selection: ContinueTarget };
 
 function PlayLevel({
   selection,
@@ -35,13 +31,13 @@ function PlayLevel({
   onExit,
   onNext,
 }: {
-  selection: Selection;
+  selection: ContinueTarget;
   settings: Settings;
   onWin: (packId: string, index: number) => void;
   onExit: () => void;
   onNext: () => void;
 }) {
-  const pack = findPack(selection.packId);
+  const pack = findPackById(PACKS, selection.packId);
   const levelNumber = selection.index + 1;
   const [state, dispatch] = useReducer(reducer, undefined, () =>
     createInitialState(pack.levels[selection.index]),
@@ -115,7 +111,7 @@ function readSettings() {
 }
 
 function App() {
-  const [selected, setSelected] = useState<Selection | null>(null);
+  const [route, setRoute] = useState<Route>({ name: 'welcome' });
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [settings, setSettings] = useState(readSettings);
 
@@ -139,61 +135,66 @@ function App() {
     resetProgress(localStorage);
     setCompleted(loadPackProgress(localStorage, PACKS));
     setSettings(createDefaultSettings());
-    setSelected(null);
+    setRoute({ name: 'welcome' });
   };
 
   return (
     <main className="app">
-      <h1>{GAME_NAME}</h1>
-      <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
-      {selected === null ? (
+      {route.name === 'welcome' && (
+        <Welcome
+          packs={PACKS}
+          progress={completed}
+          settings={settings}
+          onSettingsChange={setSettings}
+          onPlay={() => setRoute({ name: 'level-select' })}
+          onContinue={(target) => setRoute({ name: 'level', selection: target })}
+          onEnterPack={(packId) => setRoute({ name: 'level-select', packId })}
+        />
+      )}
+      {route.name === 'level-select' && (
         <>
           <LevelSelect
+            key={route.packId ?? 'all'}
             packs={PACKS}
             progress={completed}
-            onSelect={(packId, index) => setSelected({ packId, index })}
+            initialPackId={route.packId}
+            onSelect={(packId, index) =>
+              setRoute({ name: 'level', selection: { packId, index } })
+            }
           />
-          <fieldset className="settings">
-            <legend>Settings</legend>
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.sound}
-                onChange={(e) => setSettings((s) => ({ ...s, sound: e.target.checked }))}
-              />{' '}
-              Sound
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.animation}
-                onChange={(e) =>
-                  setSettings((s) => ({ ...s, animation: e.target.checked }))
-                }
-              />{' '}
-              Win animation
-            </label>
-          </fieldset>
+          <SettingsControls settings={settings} onChange={setSettings} />
+          <button type="button" onClick={() => setRoute({ name: 'welcome' })}>
+            Welcome Screen
+          </button>{' '}
           <button type="button" onClick={handleReset}>
             Reset progress
           </button>
         </>
-      ) : (
+      )}
+      {route.name === 'level' && (
         <PlayLevel
-          key={`${selected.packId}:${selected.index}`}
-          selection={selected}
+          key={`${route.selection.packId}:${route.selection.index}`}
+          selection={route.selection}
           settings={settings}
           onWin={handleWin}
-          onExit={() => setSelected(null)}
+          onExit={() =>
+            setRoute({ name: 'level-select', packId: route.selection.packId })
+          }
           onNext={() => {
-            // Winning just completed `selected`, so the next Level in this
+            // Winning just completed `selection`, so the next Level in this
             // Pack is unlocked by construction; at the Pack end return to
             // select.
-            const pack = findPack(selected.packId);
-            setSelected(
-              selected.index + 1 < pack.levels.length
-                ? { packId: pack.id, index: selected.index + 1 }
-                : null,
+            const pack = findPackById(PACKS, route.selection.packId);
+            setRoute(
+              route.selection.index + 1 < pack.levels.length
+                ? {
+                    name: 'level',
+                    selection: {
+                      packId: pack.id,
+                      index: route.selection.index + 1,
+                    },
+                  }
+                : { name: 'level-select', packId: pack.id },
             );
           }}
         />

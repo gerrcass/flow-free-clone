@@ -14,6 +14,53 @@
   opacity: 0.8;
 }
 
+/* Welcome Screen hero (#15): a gentle rise on arrival. The Animation
+ * toggle gates the .welcome-animated class in Welcome.tsx; the
+ * prefers-reduced-motion query below disables it unconditionally. */
+.welcome-hero {
+  margin-bottom: 16px;
+}
+
+.welcome-hero.welcome-animated {
+  animation: welcome-rise 0.4s ease-out;
+}
+
+@keyframes welcome-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-hero.welcome-animated {
+    animation: none;
+  }
+}
+
+.welcome-packs {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+/* Pack entry reads in the rounded display face; body copy and HUD stay on
+ * the system stack per the type system (#15, ADR 0006). */
+.welcome-packs button {
+  font-family: var(--heading);
+  font-weight: 600;
+}
+
+.welcome section {
+  margin-bottom: 16px;
+}
+
 .hud {
   margin: 0 0 16px;
   font-variant-numeric: tabular-nums;

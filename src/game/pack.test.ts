@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { PACK, PACKS } from './pack';
+import {
+  PACK,
+  PACKS,
+  describePack,
+  displayDifficulty,
+  findPackById,
+  packAriaLabel,
+} from './pack';
 import { PACK_PLAN, generatePack } from './generator';
 import { createInitialState, reducer } from './reducer';
 import { solveLevel } from './solver';
@@ -94,5 +101,38 @@ describe('Multi-Pack store (#12)', () => {
         pack.levels[pack.levels.length - 1].size,
       );
     }
+  });
+
+  it('finds a Pack by id, falling back to the first Pack (#15)', () => {
+    expect(findPackById(PACKS, 'classic')).toBe(PACKS[1]);
+    expect(findPackById(PACKS, 'unknown')).toBe(PACKS[0]);
+  });
+
+  it('capitalizes Difficulty for display (#15)', () => {
+    expect(displayDifficulty('starter')).toBe('Starter');
+    expect(displayDifficulty('classic')).toBe('Classic');
+    expect(displayDifficulty('expert')).toBe('Expert');
+  });
+
+  it('builds the shared Pack accessible label from its summary bundle (#15)', () => {
+    expect(
+      packAriaLabel(PACKS[0], { done: 0, total: 10, difficulty: 'Starter' }),
+    ).toBe('Starter Pack, Starter Difficulty, 0 of 10 complete');
+    expect(
+      packAriaLabel(PACKS[2], { done: 7, total: 10, difficulty: 'Expert' }),
+    ).toBe('Expert Pack, Expert Difficulty, 7 of 10 complete');
+  });
+
+  it('describes a Pack with progress and display Difficulty in one shape (#15)', () => {
+    expect(describePack({ starter: [true, false] }, PACKS[0])).toEqual({
+      done: 1,
+      total: 10,
+      difficulty: 'Starter',
+    });
+    expect(describePack({}, PACKS[1])).toEqual({
+      done: 0,
+      total: 10,
+      difficulty: 'Classic',
+    });
   });
 });

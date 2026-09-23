@@ -1,29 +1,34 @@
 import { useState } from 'react';
+import { describePack, findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
-import {
-  isUnlockedInPack,
-  packProgressCount,
-  type PackProgress,
-} from '../game/progress';
+import { isUnlockedInPack, type PackProgress } from '../game/progress';
 
 interface LevelSelectProps {
   packs: Pack[];
   progress: PackProgress;
+  initialPackId?: string;
   onSelect: (packId: string, index: number) => void;
 }
 
-export default function LevelSelect({ packs, progress, onSelect }: LevelSelectProps) {
-  const [activePackId, setActivePackId] = useState(packs[0]?.id ?? '');
-  const active = packs.find((p) => p.id === activePackId) ?? packs[0];
+export default function LevelSelect({
+  packs,
+  progress,
+  initialPackId,
+  onSelect,
+}: LevelSelectProps) {
+  const [activePackId, setActivePackId] = useState(
+    initialPackId ?? packs[0]?.id ?? '',
+  );
+  const active = findPackById(packs, activePackId);
   if (!active) return null;
   const completed = progress[active.id] ?? [];
-  const { done, total } = packProgressCount(progress, active.id);
+  const summary = describePack(progress, active);
 
   return (
     <div className="level-select">
       <div role="tablist" aria-label="Packs">
         {packs.map((pack) => {
-          const count = packProgressCount(progress, pack.id);
+          const summary = describePack(progress, pack);
           const selected = pack.id === active.id;
           return (
             <button
@@ -31,23 +36,24 @@ export default function LevelSelect({ packs, progress, onSelect }: LevelSelectPr
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-label={`${pack.name} Pack, ${pack.difficulty} Difficulty, ${count.done} of ${count.total} complete`}
+              aria-label={packAriaLabel(pack, summary)}
               onClick={() => setActivePackId(pack.id)}
             >
-              {pack.name} · {pack.difficulty} Difficulty · {count.done}/{count.total}
+              {pack.name} · {summary.difficulty} Difficulty · {summary.done}/
+              {summary.total}
             </button>
           );
         })}
       </div>
-      <section
-        role="tabpanel"
-        aria-label={`${active.name} Pack, ${active.difficulty} Difficulty, ${done} of ${total} complete`}
-      >
+      <section role="tabpanel" aria-label={packAriaLabel(active, summary)}>
         <h2>
-          {active.name} <span aria-label={`${active.difficulty} Difficulty`}>· {active.difficulty}</span>
+          {active.name}{' '}
+          <span aria-label={`${summary.difficulty} Difficulty`}>
+            · {summary.difficulty}
+          </span>
         </h2>
         <p aria-live="polite">
-          {done} of {total} complete
+          {summary.done} of {summary.total} complete
         </p>
         <ol className="level-grid">
           {active.levels.map((_, index) => {
