@@ -83,7 +83,7 @@ First record one of the two verdicts: **approved** (both axes clean — no hard 
 
 - If **approved**: the PR is safe to land, so land it — an approved verdict always closes out with a merge, never stalls:
   1. Push any outstanding local fix commits that belong to the PR first, so the merged code is exactly what was reviewed. Keep unrelated commits off the PR branch.
-  2. Leave the aggregated report (or a summary) as a PR comment recording the approval.
+  2. Post the aggregated report (or a summary) with the verdict as a PR comment detailing the review results. This is a hard gate: never merge or close the PR before this comment exists.
   3. Merge the PR (`gh pr merge <number> --merge`) and delete the branch.
   4. Close the originating ticket with a comment pointing at the merged PR, if the merge didn't auto-close it.
 - If **changes requested**: leave the aggregated report as a PR comment for review and mark the PR `ready-for-agent` (via `gh pr edit <number> --add-label "ready-for-agent"`, cf. `docs/agents/triage-labels.md`) so implementation can continue. Never merge or close a PR that still has blocking findings.
