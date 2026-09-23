@@ -41,10 +41,12 @@ function SharedPlay({
   level,
   settings,
   onExit,
+  onReset,
 }: {
   level: Level;
   settings: Settings;
   onExit: () => void;
+  onReset: () => void;
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, () =>
     createInitialState(level),
@@ -87,6 +89,9 @@ function SharedPlay({
       </button>{' '}
       <button type="button" onClick={onExit}>
         Welcome Screen
+      </button>{' '}
+      <button type="button" onClick={onReset}>
+        Reset progress
       </button>
     </section>
   );
@@ -204,7 +209,7 @@ function readSettings() {
 /**
  * One bundle for the share fragment read (#16): the route plus whether
  * the fragment was a bad share link. Both travel together from the single
- * mount-time parse into the hashchange handler below.
+ * mount-time parse.
  */
 interface HashRoute {
   route: Route;
@@ -248,27 +253,6 @@ function App() {
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
-
-  // Opening a pasted share link mid-session loads the same verified Board
-  // as a fresh load (#16); the hash fragment never hits the network, so
-  // this also works offline after first load. Clearing the hash exits the
-  // shared Board, keeping the hash the source of truth for the route.
-  useEffect(() => {
-    const onHashChange = () => {
-      const next = readSharedRoute();
-      if (next.invalid) {
-        setSharedInvalid(true);
-        setRoute({ name: 'welcome' });
-      } else if (next.route.name === 'shared') {
-        setSharedInvalid(false);
-        setRoute(next.route);
-      } else {
-        setRoute((prev) => (prev.name === 'shared' ? { name: 'welcome' } : prev));
-      }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
 
   useEffect(() => {
     savePackProgress(localStorage, completed, stars);
@@ -322,7 +306,12 @@ function App() {
         </p>
       )}
       {route.name === 'shared' && (
-        <SharedPlay level={route.level} settings={settings} onExit={exitShared} />
+        <SharedPlay
+          level={route.level}
+          settings={settings}
+          onExit={exitShared}
+          onReset={handleReset}
+        />
       )}
       {route.name === 'welcome' && (
         <Welcome

@@ -6,7 +6,6 @@ export const SHARE_HASH_PREFIX = '#level=';
 const MIN_SIZE = 2;
 const MAX_SIZE = 9;
 const MAX_COLORS = 8;
-const ID_PATTERN = /^[A-Za-z0-9]{1,2}$/;
 
 type CompactColor = [id: string, r1: number, c1: number, r2: number, c2: number];
 
@@ -66,9 +65,13 @@ function isIntIn(value: unknown, min: number, max: number): value is number {
 }
 
 /**
- * Structural validation only (no solver): size 2-9, 1-8 Colors, unique
- * 1-2 char alphanumeric ids, integer Endpoints in bounds, all Endpoint
- * Cells distinct. Returns the Level, or null for any malformed payload.
+ * Structural validation only (no solver). Domain rules come from
+ * CONTEXT.md: each Cell holds at most one Pipe segment (all Endpoint
+ * Cells distinct) and each Color has exactly two Endpoints (unique
+ * non-empty ids, two in-bounds Endpoints each). Practical bounds — size
+ * 2-9, 1-8 Colors matching the palette/generator range — keep crafted
+ * links from sending the budgeted solver off on huge Boards. Returns the
+ * Level, or null for any malformed payload.
  */
 function fromCompact(doc: unknown): Level | null {
   if (typeof doc !== 'object' || doc === null) return null;
@@ -81,7 +84,7 @@ function fromCompact(doc: unknown): Level | null {
   for (const entry of c) {
     if (!Array.isArray(entry) || entry.length !== 5) return null;
     const [id, r1, c1, r2, c2] = entry as unknown[];
-    if (typeof id !== 'string' || !ID_PATTERN.test(id) || seenIds.has(id)) {
+    if (typeof id !== 'string' || id.length === 0 || seenIds.has(id)) {
       return null;
     }
     if (
@@ -132,12 +135,13 @@ export function buildShareHash(level: Level): string {
 }
 
 /**
- * Parse a location hash to a structurally valid Level, or null.
- * Reads only the `level` token so trailing params (`&...`) are ignored.
+ * Parse a location hash to a structurally valid Level, or null. Strict:
+ * the whole fragment after `#level=` must be the payload, so suffixed
+ * junk fails instead of silently loading a different Board.
  */
 export function parseShareHash(hash: string): Level | null {
   if (!hash.startsWith(SHARE_HASH_PREFIX)) return null;
-  const token = hash.slice(SHARE_HASH_PREFIX.length).split('&')[0] ?? '';
+  const token = hash.slice(SHARE_HASH_PREFIX.length);
   if (token.length === 0) return null;
   return decodeLevelPayload(token);
 }
@@ -168,6 +172,11 @@ export async function copyShareLink(level: Level): Promise<string> {
   return url;
 }
 
+export interface SharedVerifyOptions {
+  /** Solver step budget override (tests); defaults to the Solver seam's own. */
+  maxSteps?: number;
+}
+
 /**
  * Load a shared Board from a location hash (#16): structural decode plus
  * Solver-seam verification that the Board is completable. Returns the
@@ -175,8 +184,13 @@ export async function copyShareLink(level: Level): Promise<string> {
  * Verification shares the solver's step budget: pathological Boards past
  * the budget read as unsolvable, the same limit the Pack tools accept.
  */
-export function loadSharedLevelFromHash(hash: string): Level | null {
+export function loadSharedLevelFromHash(
+  hash: string,
+  options: SharedVerifyOptions = {},
+): Level | null {
   const level = parseShareHash(hash);
   if (level === null) return null;
-  return solveLevel(level) === null ? null : level;
+  return solveLevel(level, options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }) === null
+    ? null
+    : level;
 }

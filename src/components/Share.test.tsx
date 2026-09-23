@@ -58,21 +58,7 @@ describe('share-via-URL in the App shell (#16)', () => {
     expect(screen.queryByRole('grid')).toBeNull();
   });
 
-  it('loads a pasted link mid-session through hashchange', async () => {
-    render(<App />);
-    expect(screen.queryByRole('grid')).toBeNull();
-    window.location.hash = buildShareHash(FIXTURE_LEVEL);
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(screen.getByRole('grid')).toBeTruthy());
-  });
 
-  it('exits the shared Board when the hash is cleared', async () => {
-    openAppWithHash(buildShareHash(FIXTURE_LEVEL));
-    expect(screen.getByRole('grid')).toBeTruthy();
-    window.location.hash = '';
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(screen.queryByRole('grid')).toBeNull());
-  });
 
   it('copies a round-tripping share URL from a Pack Level', async () => {
     const writeText = vi.fn(async (_text: string) => {});
@@ -158,5 +144,18 @@ describe('shared Levels leave the persisted store alone (#16)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset progress' }));
     expect(screen.queryByRole('alert')).toBeNull();
     expect(window.location.hash).toBe('');
+  });
+
+  it('reset from a valid shared Board exits to Welcome with a clean store', () => {
+    openAppWithHash(buildShareHash(FIXTURE_LEVEL));
+    expect(screen.getByRole('grid')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset progress' }));
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(loadPackProgress(localStorage, PACKS)).toEqual(
+      emptyPackProgress(PACKS),
+    );
+    expect(loadPackStars(localStorage, PACKS)).toEqual(emptyPackStars(PACKS));
   });
 });

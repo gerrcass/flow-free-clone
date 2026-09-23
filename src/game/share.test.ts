@@ -42,10 +42,22 @@ describe('invalid-link handling (#16)', () => {
     expect(parseShareHash(`#level=${payload.slice(0, 4)}`)).toBeNull();
   });
 
-  it('rejects wrong fragments and only reads the level token', () => {
+  it('rejects wrong fragments and suffixed junk strictly', () => {
     expect(parseShareHash('#other=abc')).toBeNull();
     const payload = encodeLevel(FIXTURE_LEVEL);
-    expect(parseShareHash(`#level=${payload}&foo=bar`)).toEqual(FIXTURE_LEVEL);
+    expect(parseShareHash(`#level=${payload}&foo=bar`)).toBeNull();
+    expect(parseShareHash(`#level=${payload} `)).toBeNull();
+  });
+
+  it('round-trips multi-character Color ids', () => {
+    const level: Level = {
+      size: 5,
+      colors: [
+        { id: 'AA', endpoints: [{ row: 0, col: 0 }, { row: 0, col: 4 }] },
+        { id: 'B7', endpoints: [{ row: 1, col: 0 }, { row: 1, col: 4 }] },
+      ],
+    };
+    expect(parseShareHash(buildShareHash(level))).toEqual(level);
   });
 
   it('rejects out-of-bounds and overlapping Endpoints', () => {
@@ -64,7 +76,7 @@ describe('invalid-link handling (#16)', () => {
     expect(parseShareHash(buildShareHash(overlap))).toBeNull();
   });
 
-  it('rejects duplicate ids, bad sizes, and tampered payloads', () => {
+  it('rejects duplicate or empty ids, bad sizes, and tampered payloads', () => {
     const dup: Level = {
       size: 5,
       colors: [
@@ -73,6 +85,11 @@ describe('invalid-link handling (#16)', () => {
       ],
     };
     expect(parseShareHash(buildShareHash(dup))).toBeNull();
+    const emptyId: Level = {
+      size: 5,
+      colors: [{ id: '', endpoints: [{ row: 0, col: 0 }, { row: 0, col: 1 }] }],
+    };
+    expect(parseShareHash(buildShareHash(emptyId))).toBeNull();
     expect(decodeLevelPayload(encodeLevel({ size: 1, colors: [] }))).toBeNull();
     expect(decodeLevelPayload(encodeLevel({ size: 10, colors: [] }))).toBeNull();
     // Valid base64 of non-Level JSON decodes structurally invalid.
@@ -112,5 +129,16 @@ describe('solver verification on load (#16)', () => {
   it('rejects garbage hashes without running the solver', () => {
     expect(loadSharedLevelFromHash('#level=!!!')).toBeNull();
     expect(loadSharedLevelFromHash('')).toBeNull();
+  });
+
+  it('maps solver budget exhaustion to an invalid link', () => {
+    // A tiny budget exhausts before the fixture solves: the share path
+    // reports invalid instead of hanging or throwing.
+    expect(
+      loadSharedLevelFromHash(buildShareHash(FIXTURE_LEVEL), { maxSteps: 5 }),
+    ).toBeNull();
+    expect(loadSharedLevelFromHash(buildShareHash(FIXTURE_LEVEL))).toEqual(
+      FIXTURE_LEVEL,
+    );
   });
 });
