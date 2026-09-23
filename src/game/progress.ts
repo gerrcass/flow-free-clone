@@ -7,6 +7,9 @@ export const SETTINGS_KEY = 'flow-free-clone:settings:v1';
 /** Per-Pack completion map keyed by Pack id (#12). */
 export type PackProgress = Record<string, boolean[]>;
 
+/** Per-Pack stars map keyed by Pack id (#14): 0-3 stars per Level. */
+export type PackStars = Record<string, number[]>;
+
 export interface PackLike {
   id: string;
   levels: Level[];
@@ -87,6 +90,83 @@ export function emptyPackProgress(packs: PackLike[]): PackProgress {
     out[pack.id] = Array.from({ length: pack.levels.length }, () => false);
   }
   return out;
+}
+
+/** All-zero stars matching each Pack shape (#14). */
+export function emptyPackStars(packs: PackLike[]): PackStars {
+  const out: PackStars = {};
+  for (const pack of packs) {
+    out[pack.id] = Array.from({ length: pack.levels.length }, () => 0);
+  }
+  return out;
+}
+
+/**
+ * Lenient star-array normalization (#14): unlike completion, a bad stars
+ * entry never invalidates the whole store — non-integer or out-of-range
+ * entries read as 0, short arrays pad with 0, long ones truncate. Stars
+ * stay a best-effort chase goal next to the authoritative completion map.
+ */
+function normalizeStarArray(value: unknown, length: number): number[] {
+  const arr = Array.isArray(value) ? value : [];
+  return Array.from({ length }, (_, i) => {
+    const entry = arr[i];
+    return Number.isInteger(entry) && (entry as number) >= 0 && (entry as number) <= 3
+      ? (entry as number)
+      : 0;
+  });
+}
+
+function readRawV2Doc(storage: StorageLike): {
+  version?: unknown;
+  completed?: unknown;
+  stars?: unknown;
+} | null {
+  try {
+    const raw = storage.getItem(PROGRESS_V2_KEY);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return parsed as { version?: unknown; completed?: unknown; stars?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load per-Pack stars (#14). Reads the `stars` field of the v2 store;
+ * missing, corrupt, or ragged entries fall back to zero stars without
+ * touching completion.
+ */
+export function loadPackStars(storage: StorageLike, packs: PackLike[]): PackStars {
+  const doc = readRawV2Doc(storage);
+  const starred = doc !== null && typeof doc.stars === 'object' && doc.stars !== null
+    ? (doc.stars as Record<string, unknown>)
+    : null;
+  const out: PackStars = {};
+  for (const pack of packs) {
+    out[pack.id] = normalizeStarArray(starred?.[pack.id], pack.levels.length);
+  }
+  return out;
+}
+
+/**
+ * Keep the best stars earned per Pack/Level (#14): a new result only
+ * replaces the stored one when higher. Out-of-range writes return the
+ * input unchanged.
+ */
+export function recordStars(
+  prev: PackStars,
+  packId: string,
+  index: number,
+  earned: number,
+): PackStars {
+  const arr = prev[packId];
+  if (!Array.isArray(arr) || index < 0 || index >= arr.length) return prev;
+  if (!Number.isInteger(earned) || earned <= (arr[index] ?? 0)) return prev;
+  const next = { ...prev, [packId]: [...arr] };
+  next[packId][index] = Math.min(3, Math.max(0, earned));
+  return next;
 }
 
 /** Done/total pair driving per-Pack progress indication in Level select. */
@@ -194,13 +274,30 @@ export function loadPackProgress(
 
 /**
  * Persist the per-Pack map to the v2 key only (#12). The legacy key is
- * never written here, keeping migration one-way (legacy → v2).
+ * never written here, keeping migration one-way (legacy → v2). An
+ * optional stars map (#14) is stored in the same document alongside
+ * completion; when omitted, pre-existing stars are preserved so older
+ * two-argument call sites never wipe the chase goal.
  */
 export function savePackProgress(
   storage: StorageLike,
   progress: PackProgress,
+  stars?: PackStars,
 ): void {
-  storage.setItem(PROGRESS_V2_KEY, JSON.stringify({ version: 2, completed: progress }));
+  const keep = stars ?? readRawV2DocStars(storage);
+  storage.setItem(
+    PROGRESS_V2_KEY,
+    JSON.stringify({ version: 2, completed: progress, stars: keep }),
+  );
+}
+
+/** Stars already in the v2 document, or undefined when there are none. */
+function readRawV2DocStars(storage: StorageLike): PackStars | undefined {
+  const doc = readRawV2Doc(storage);
+  if (doc === null || typeof doc.stars !== 'object' || doc.stars === null) {
+    return undefined;
+  }
+  return doc.stars as PackStars;
 }
 
 export interface ContinueTarget {

@@ -7,15 +7,18 @@ import {
   completeLevel,
   createDefaultSettings,
   emptyPackProgress,
+  emptyPackStars,
   findContinueTarget,
   groupBySize,
   isUnlocked,
   isUnlockedInPack,
   loadPackProgress,
+  loadPackStars,
   loadProgress,
   loadSettings,
   migrateLegacyProgress,
   packProgressCount,
+  recordStars,
   resetProgress,
   savePackProgress,
   saveProgress,
@@ -324,5 +327,95 @@ describe('v1-to-v2 migration (#12)', () => {
     expect(storage.peek()[PROGRESS_V2_KEY]).toBeDefined();
     expect(storage.peek()[PROGRESS_KEY]).toBeUndefined();
     expect(loadPackProgress(storage, PACKS)).toEqual(v2);
+  });
+});
+
+describe('stars alongside completion (#14)', () => {
+  it('starts every Pack/Level at zero stars', () => {
+    const stars = emptyPackStars(PACKS);
+    expect(Object.keys(stars)).toEqual(['starter', 'classic', 'expert']);
+    expect(stars.starter).toEqual(Array(10).fill(0));
+    expect(stars.expert).toEqual(Array(10).fill(0));
+  });
+
+  it('round-trips stars through the v2 key next to completion', () => {
+    const storage = memStorage();
+    const completed = emptyPackProgress(PACKS);
+    completed.starter[0] = true;
+    const stars = emptyPackStars(PACKS);
+    stars.starter[0] = 2;
+    savePackProgress(storage, completed, stars);
+    expect(loadPackProgress(storage, PACKS)).toEqual(completed);
+    expect(loadPackStars(storage, PACKS)).toEqual(stars);
+    expect(storage.peek()[PROGRESS_KEY]).toBeUndefined();
+  });
+
+  it('keeps pre-existing stars when saved without a stars argument', () => {
+    const storage = memStorage();
+    const stars = emptyPackStars(PACKS);
+    stars.starter[0] = 3;
+    savePackProgress(storage, emptyPackProgress(PACKS), stars);
+    const completed = emptyPackProgress(PACKS);
+    completed.starter[0] = true;
+    savePackProgress(storage, completed);
+    expect(loadPackStars(storage, PACKS).starter[0]).toBe(3);
+    expect(loadPackProgress(storage, PACKS)).toEqual(completed);
+  });
+
+  it('falls back to zero stars when the v2 store has no usable stars', () => {
+    expect(loadPackStars(memStorage(), PACKS)).toEqual(emptyPackStars(PACKS));
+    const legacyOnly = memStorage({
+      [PROGRESS_KEY]: JSON.stringify([true, ...Array(29).fill(false)]),
+    });
+    loadPackProgress(legacyOnly, PACKS);
+    expect(loadPackStars(legacyOnly, PACKS)).toEqual(emptyPackStars(PACKS));
+    const corrupt = memStorage({
+      [PROGRESS_V2_KEY]: JSON.stringify({
+        version: 2,
+        completed: emptyPackProgress(PACKS),
+        stars: { starter: ['many', ...Array(9).fill(false)] },
+      }),
+    });
+    const loaded = loadPackStars(corrupt, PACKS);
+    expect(loaded.starter).toEqual(Array(10).fill(0));
+    expect(loadPackProgress(corrupt, PACKS)).toEqual(emptyPackProgress(PACKS));
+  });
+
+  it('pads short and truncates long star arrays like completion does', () => {
+    const storage = memStorage({
+      [PROGRESS_V2_KEY]: JSON.stringify({
+        version: 2,
+        completed: emptyPackProgress(PACKS),
+        stars: {
+          starter: [2],
+          classic: [...Array(12).fill(1)],
+          expert: [...Array(10).fill(3)],
+        },
+      }),
+    });
+    const loaded = loadPackStars(storage, PACKS);
+    expect(loaded.starter).toEqual([2, ...Array(9).fill(0)]);
+    expect(loaded.classic).toEqual(Array(10).fill(1));
+    expect(loaded.expert).toEqual(Array(10).fill(3));
+  });
+
+  it('keeps the best stars per Pack/Level and ignores out-of-range writes', () => {
+    const empty = emptyPackStars(PACKS);
+    const once = recordStars(empty, 'starter', 0, 1);
+    expect(once.starter[0]).toBe(1);
+    expect(recordStars(once, 'starter', 0, 3).starter[0]).toBe(3);
+    expect(recordStars(once, 'starter', 0, 1).starter[0]).toBe(1);
+    expect(recordStars(once, 'unknown', 0, 3)).toEqual(once);
+    expect(recordStars(once, 'starter', 99, 3)).toEqual(once);
+  });
+
+  it('clears stars on reset along with the v2 key', () => {
+    const storage = memStorage();
+    const stars = emptyPackStars(PACKS);
+    stars.starter[0] = 2;
+    savePackProgress(storage, emptyPackProgress(PACKS), stars);
+    resetProgress(storage);
+    expect(storage.peek()[PROGRESS_V2_KEY]).toBeUndefined();
+    expect(loadPackStars(storage, PACKS)).toEqual(emptyPackStars(PACKS));
   });
 });
