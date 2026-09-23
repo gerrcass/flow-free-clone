@@ -18,3 +18,45 @@
   margin-top: 16px;
   font-weight: 600;
 }
+
+.win-overlay {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+}
+
+.level-select section {
+  margin-bottom: 24px;
+}
+
+.level-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+
+.level-button {
+  width: 100%;
+  padding: 12px 0;
+  font-size: 1rem;
+}
+
+.level-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.checkmark {
+  font-weight: 700;
+}
+
+.settings {
+  margin: 16px 0;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
