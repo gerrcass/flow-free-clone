@@ -1,6 +1,6 @@
 import { describePack, findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
-import { findContinueTarget } from '../game/progress';
+import { areAllPacksComplete, findContinueTarget } from '../game/progress';
 import type { ContinueTarget, PackProgress, Settings } from '../game/progress';
 import { GAME_NAME } from '../game/theme';
 import SettingsControls from './SettingsControls';
@@ -38,17 +38,16 @@ export default function Welcome({
   // while Play is always the way forward.
   const target = findContinueTarget(progress, packs);
   const targetPack = target ? findPackById(packs, target.packId) : undefined;
-  const allPacksComplete =
-    packs.length > 0 &&
-    packs.every(
-      (pack) => describePack(progress, pack).done === pack.levels.length,
-    );
+  // Greyed-Continue reason shares the progress seam's predicate (#15).
+  const allPacksComplete = areAllPacksComplete(progress, packs);
 
   return (
     <div className="welcome">
-      {/* Hero rise is CSS-only (#15): no settings toggle involved, and
-        prefers-reduced-motion disables it — see App.css. */}
-      <header className="welcome-hero">
+      {/* Hero rise respects the Animation toggle plus reduced-motion (#15):
+        the toggle gates the class, the media query kills it always. */}
+      <header
+        className={`welcome-hero${settings.animation ? ' welcome-animated' : ''}`}
+      >
         <h1>{GAME_NAME}</h1>
         <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       </header>

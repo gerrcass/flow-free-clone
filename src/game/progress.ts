@@ -234,6 +234,25 @@ export function findContinueTarget(
   return null;
 }
 
+/**
+ * Single source for "every Pack complete" (#15): the greyed-Continue
+ * reason in Welcome reuses the same predicate instead of re-deriving it
+ * from per-Pack counts. Ragged arrays read as incomplete beyond length.
+ */
+export function areAllPacksComplete(
+  progress: PackProgress,
+  packs: PackLike[],
+): boolean {
+  if (packs.length === 0) return false;
+  return packs.every((pack) => {
+    const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
+    return (
+      pack.levels.length > 0 &&
+      pack.levels.every((_, level) => arr[level] === true)
+    );
+  });
+}
+
 export function createDefaultSettings(): Settings {
   return { sound: true, animation: true };
 }

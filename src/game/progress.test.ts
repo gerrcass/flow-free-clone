@@ -3,6 +3,7 @@ import {
   PROGRESS_KEY,
   PROGRESS_V2_KEY,
   SETTINGS_KEY,
+  areAllPacksComplete,
   completeLevel,
   createDefaultSettings,
   emptyPackProgress,
@@ -195,6 +196,26 @@ describe('continue target (#15)', () => {
       packId: 'pack-0',
       index: 1,
     });
+  });
+});
+
+describe('all packs complete (#15)', () => {
+  const packsOf = (sizes: number[]) =>
+    sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
+
+  it('is false for a fresh player and true when every Pack is complete', () => {
+    const packs = packsOf([2, 2]);
+    expect(areAllPacksComplete(emptyPackProgress(packs), packs)).toBe(false);
+    expect(
+      areAllPacksComplete({ 'pack-0': [true, true], 'pack-1': [true, true] }, packs),
+    ).toBe(true);
+  });
+
+  it('is false with no Packs and reads ragged arrays as incomplete', () => {
+    expect(areAllPacksComplete({}, [])).toBe(false);
+    const packs = packsOf([3]);
+    expect(areAllPacksComplete({}, packs)).toBe(false);
+    expect(areAllPacksComplete({ 'pack-0': [true] }, packs)).toBe(false);
   });
 });
 

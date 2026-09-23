@@ -14,12 +14,14 @@
   opacity: 0.8;
 }
 
-/* Welcome Screen hero (#15): a gentle rise on arrival, CSS-only on
- * purpose — no settings toggle is involved, so there is nothing to
- * conflate with the win-overlay motion, and prefers-reduced-motion
- * disables it unconditionally. */
+/* Welcome Screen hero (#15): a gentle rise on arrival. The Animation
+ * toggle gates the .welcome-animated class in Welcome.tsx; the
+ * prefers-reduced-motion query below disables it unconditionally. */
 .welcome-hero {
   margin-bottom: 16px;
+}
+
+.welcome-hero.welcome-animated {
   animation: welcome-rise 0.4s ease-out;
 }
 
@@ -35,7 +37,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .welcome-hero {
+  .welcome-hero.welcome-animated {
     animation: none;
   }
 }

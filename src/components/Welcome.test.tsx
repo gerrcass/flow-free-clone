@@ -177,29 +177,39 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
     ).toBeTruthy();
   });
 
-  it('carries the settings toggles; hero motion is CSS-only plus reduced-motion', () => {
+  it('carries the settings toggles; the Animation toggle gates hero motion', () => {
     render(<App />);
     expect(
       screen.getByRole('checkbox', { name: 'Sound' }) as HTMLInputElement,
     ).toHaveProperty('checked', true);
-    expect(
-      screen.getByRole('checkbox', { name: 'Win animation' }),
-    ).toBeTruthy();
+    const animation = screen.getByRole('checkbox', {
+      name: 'Animation',
+    }) as HTMLInputElement;
+    expect(animation.checked).toBe(true);
 
-    // CSS-only rise, no toggle involved: parsed stylesheet rules (not
-    // string matching) carry the keyframes, and prefers-reduced-motion
-    // disables the hero unconditionally.
-    const sheet = appStyleSheet();
-    const texts = Array.from(sheet.cssRules, (rule) => rule.cssText);
+    // Toggle-gated rise: the hero carries .welcome-animated while the
+    // toggle is on, and drops it when off. Reduced-motion kills it
+    // unconditionally via the parsed media rule.
     expect(
-      texts.some(
-        (text) =>
-          text.includes('welcome-rise') &&
-          (text.includes('@keyframes') || text.includes('translateY')),
-      ),
-    ).toBe(true);
+      document.querySelector('.welcome-hero.welcome-animated'),
+    ).toBeTruthy();
+    fireEvent.click(animation);
+    expect(
+      document.querySelector('.welcome-hero.welcome-animated'),
+    ).toBeNull();
+
+    const sheet = appStyleSheet();
+    const animatedRule = findStyleRule(
+      sheet.cssRules,
+      '.welcome-hero.welcome-animated',
+    );
+    expect(animatedRule?.style.getPropertyValue('animation')).toContain(
+      'welcome-rise',
+    );
     const reduced = findMediaRule(sheet, 'prefers-reduced-motion');
-    const heroRule = reduced && findStyleRule(reduced.cssRules, '.welcome-hero');
+    const heroRule =
+      reduced &&
+      findStyleRule(reduced.cssRules, '.welcome-hero.welcome-animated');
     expect(heroRule?.style.getPropertyValue('animation')).toContain('none');
   });
 
@@ -241,7 +251,10 @@ describe('Welcome type system and brand (#15)', () => {
 
     // The face itself lives in the inline <style> so its URL resolves
     // against the document, not a stylesheet directory.
-    const style = head.querySelector('style')?.textContent ?? '';
+    const style =
+      Array.from(head.querySelectorAll('style')).find((el) =>
+        (el.textContent ?? '').includes('@font-face'),
+      )?.textContent ?? '';
     expect(style).toContain(`font-family: '${DISPLAY_FONT_FAMILY}'`);
     expect(style).toContain(`url('./${DISPLAY_FONT_FILE}')`);
     expect(style).toContain('font-display: swap');
@@ -256,18 +269,27 @@ describe('Welcome type system and brand (#15)', () => {
   });
 
   it('renders the wordmark through the display stack to the self-hosted face', () => {
-    // Global cascade applied: the rendered H1 must resolve its face
-    // through var(--heading), whose definition starts with the display
-    // family, whose @font-face rule points at the vendored file.
+    // Stylesheet chain (jsdom has no font engine, so no computed-face
+    // claim): the rendered H1 sits under h1 { font-family: var(--heading) },
+    // --heading starts with the display family, and the shipped @font-face
+    // rule carries that family plus the vendored file URL.
     const global = document.createElement('style');
     global.textContent = readFile('src/index.css');
     document.head.appendChild(global);
     render(<App />);
     const wordmark = screen.getByRole('heading', { name: GAME_NAME });
     expect(wordmark.tagName).toBe('H1');
-    expect(
-      getComputedStyle(wordmark).getPropertyValue('font-family'),
-    ).toContain('var(--heading)');
+    const h1Rule = Array.from(
+      (global.sheet as CSSStyleSheet).cssRules,
+    ).find(
+      (candidate) =>
+        candidate.type === CSSRule.STYLE_RULE &&
+        (candidate as CSSStyleRule).selectorText.includes('h1') &&
+        (candidate as CSSStyleRule).style
+          .getPropertyValue('font-family')
+          .includes('var(--heading)'),
+    ) as CSSStyleRule | undefined;
+    expect(h1Rule).toBeTruthy();
 
     const rootRule = findStyleRule(
       (global.sheet as CSSStyleSheet).cssRules,
@@ -278,7 +300,9 @@ describe('Welcome type system and brand (#15)', () => {
     expect(heading).toContain('system-ui');
 
     const faceText =
-      shellDoc().head.querySelector('style')?.textContent ?? '';
+      Array.from(shellDoc().head.querySelectorAll('style')).find((el) =>
+        (el.textContent ?? '').includes('@font-face'),
+      )?.textContent ?? '';
     const faceStyle = document.createElement('style');
     faceStyle.textContent = faceText;
     document.head.appendChild(faceStyle);
