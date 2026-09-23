@@ -36,6 +36,24 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Navigation requests fall back to the cached shell so a reload while
+  // offline still boots the Board (hashed Vite assets are runtime-cached
+  // on first load, so no build-time hash list is needed here).
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).then(
+        (response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put('/index.html', copy));
+          }
+          return response;
+        },
+        () => caches.match('/index.html', { ignoreSearch: true }),
+      ),
+    );
+    return;
+  }
   event.respondWith(
     caches.match(request, { ignoreSearch: true }).then((cached) => {
       const network = fetch(request).then(
