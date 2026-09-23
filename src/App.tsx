@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Board from './components/Board';
 import LevelSelect from './components/LevelSelect';
 import { PACKS } from './game/pack';
+import type { Pack } from './game/pack';
 import {
   completeLevel,
   createDefaultSettings,
@@ -23,6 +24,10 @@ interface Selection {
   index: number;
 }
 
+function findPack(packId: string): Pack {
+  return PACKS.find((p) => p.id === packId) ?? PACKS[0];
+}
+
 function PlayLevel({
   selection,
   settings,
@@ -36,7 +41,7 @@ function PlayLevel({
   onExit: () => void;
   onNext: () => void;
 }) {
-  const pack = PACKS.find((p) => p.id === selection.packId) ?? PACKS[0];
+  const pack = findPack(selection.packId);
   const levelNumber = selection.index + 1;
   const [state, dispatch] = useReducer(reducer, undefined, () =>
     createInitialState(pack.levels[selection.index]),
@@ -184,7 +189,7 @@ function App() {
             // Winning just completed `selected`, so the next Level in this
             // Pack is unlocked by construction; at the Pack end return to
             // select.
-            const pack = PACKS.find((p) => p.id === selected.packId) ?? PACKS[0];
+            const pack = findPack(selected.packId);
             setSelected(
               selected.index + 1 < pack.levels.length
                 ? { packId: pack.id, index: selected.index + 1 }

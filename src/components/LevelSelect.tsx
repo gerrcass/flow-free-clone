@@ -34,7 +34,7 @@ export default function LevelSelect({ packs, progress, onSelect }: LevelSelectPr
               aria-label={`${pack.name} Pack, ${pack.difficulty} Difficulty, ${count.done} of ${count.total} complete`}
               onClick={() => setActivePackId(pack.id)}
             >
-              {pack.name} · {count.done}/{count.total}
+              {pack.name} · {pack.difficulty} Difficulty · {count.done}/{count.total}
             </button>
           );
         })}
