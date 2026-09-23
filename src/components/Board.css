@@ -1,0 +1,36 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(var(--board-size, 5), 1fr);
+  width: min(92vw, 480px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  background: #1c1e26;
+  border-radius: 12px;
+  padding: 8px;
+  gap: 4px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell {
+  position: relative;
+  background: #262933;
+  border-radius: 8px;
+  aspect-ratio: 1;
+  cursor: pointer;
+}
+
+.cell .pipe {
+  position: absolute;
+  inset: 12%;
+  border-radius: 6px;
+  opacity: 0.75;
+}
+
+.cell .endpoint {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
