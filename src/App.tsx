@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Board from './components/Board';
 import LevelSelect from './components/LevelSelect';
 import { PACK } from './game/pack';
@@ -11,17 +11,22 @@ import {
   saveProgress,
   saveSettings,
 } from './game/progress';
+import type { Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
+import { playWinSound } from './game/sound';
+import { GAME_NAME } from './game/theme';
 import { fillRatio, isSolved } from './game/win';
 import './App.css';
 
 function PlayLevel({
   index,
+  settings,
   onWin,
   onExit,
   onNext,
 }: {
   index: number;
+  settings: Settings;
   onWin: (index: number) => void;
   onExit: () => void;
   onNext: () => void;
@@ -32,10 +37,20 @@ function PlayLevel({
   const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
   const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
   const hasNext = index + 1 < PACK.length;
+  // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
+  // transition within one Level only.
+  const wasSolved = useRef(false);
 
   useEffect(() => {
     if (solved) onWin(index);
   }, [solved, index, onWin]);
+
+  useEffect(() => {
+    // Fire only on the solving transition: flipping the sound toggle
+    // on an already-solved Board must not replay the chime.
+    if (solved && !wasSolved.current) playWinSound({ enabled: settings.sound });
+    wasSolved.current = solved;
+  }, [solved, settings.sound]);
 
   return (
     <section aria-label={`Level ${index + 1}`}>
@@ -44,7 +59,11 @@ function PlayLevel({
       </p>
       <Board state={state} dispatch={dispatch} />
       {solved && (
-        <div className="win-overlay" role="dialog" aria-label={`Level ${index + 1} complete`}>
+        <div
+          className={settings.animation ? 'win-overlay win-animated' : 'win-overlay'}
+          role="dialog"
+          aria-label={`Level ${index + 1} complete`}
+        >
           <p className="win" role="status">
             Level {index + 1} complete: every Cell filled and every Color connected.
           </p>
@@ -108,7 +127,8 @@ function App() {
 
   return (
     <main className="app">
-      <h1>Flow Free Clone</h1>
+      <h1>{GAME_NAME}</h1>
+      <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       {selected === null ? (
         <>
           <LevelSelect completed={completed} onSelect={setSelected} />
@@ -141,6 +161,7 @@ function App() {
         <PlayLevel
           key={selected}
           index={selected}
+          settings={settings}
           onWin={handleWin}
           onExit={() => setSelected(null)}
           onNext={() => {

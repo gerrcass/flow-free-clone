@@ -6,7 +6,12 @@
 }
 
 .app h1 {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.tagline {
+  margin: 0 0 16px;
+  opacity: 0.8;
 }
 
 .hud {
@@ -24,6 +29,45 @@
   padding: 16px;
   border: 1px solid currentColor;
   border-radius: 12px;
+}
+
+/* Minimal win celebration: the overlay pops in and the message glows
+ * gently. Only applied when the win-animation toggle is on; the
+ * prefers-reduced-motion query below disables it unconditionally. */
+@keyframes win-pop {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes win-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(255, 209, 102, 0);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(255, 209, 102, 0.9);
+  }
+}
+
+.win-animated {
+  animation: win-pop 0.35s ease-out;
+}
+
+.win-animated .win {
+  animation: win-glow 1.6s ease-in-out 0.35s 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-animated,
+  .win-animated .win {
+    animation: none;
+  }
 }
 
 .level-select section {

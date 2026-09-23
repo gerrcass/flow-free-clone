@@ -5,19 +5,8 @@ import type { BoardAction } from '../game/reducer';
 import type { CellPos } from '../game/types';
 import { samePos } from '../game/cells';
 import { DrawSession } from '../game/drawSession';
+import { PALETTE } from '../game/theme';
 import './Board.css';
-
-/** Temporary fixture palette (distinct branding lands with #4). */
-const PALETTE: Record<string, string> = {
-  R: '#e5484d',
-  G: '#46a758',
-  B: '#3e63dd',
-  Y: '#e2a336',
-  P: '#8e4ec6',
-  O: '#f76b15',
-  C: '#12a594',
-  M: '#d6409f',
-};
 
 interface BoardProps {
   state: BoardState;
