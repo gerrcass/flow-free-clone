@@ -224,21 +224,22 @@ function clearShareHash(): void {
 }
 
 function App() {
-  const [route, setRoute] = useState<Route>(() => {
-    if (typeof window === 'undefined') return { name: 'welcome' };
-    return readSharedRoute().route;
+  // One hash parse per mount: the Solver-seam verify inside is the
+  // expensive part, so route and invalid flag share a single read.
+  const [initial] = useState<{ route: Route; invalid: boolean }>(() => {
+    if (typeof window === 'undefined') return { route: { name: 'welcome' }, invalid: false };
+    return readSharedRoute();
   });
-  const [sharedInvalid, setSharedInvalid] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return readSharedRoute().invalid;
-  });
+  const [route, setRoute] = useState<Route>(initial.route);
+  const [sharedInvalid, setSharedInvalid] = useState(initial.invalid);
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
 
   // Opening a pasted share link mid-session loads the same verified Board
   // as a fresh load (#16); the hash fragment never hits the network, so
-  // this also works offline after first load.
+  // this also works offline after first load. Clearing the hash exits the
+  // shared Board, keeping the hash the source of truth for the route.
   useEffect(() => {
     const onHashChange = () => {
       const next = readSharedRoute();
@@ -248,6 +249,8 @@ function App() {
       } else if (next.route.name === 'shared') {
         setSharedInvalid(false);
         setRoute(next.route);
+      } else {
+        setRoute((prev) => (prev.name === 'shared' ? { name: 'welcome' } : prev));
       }
     };
     window.addEventListener('hashchange', onHashChange);
@@ -273,6 +276,10 @@ function App() {
 
   const handleReset = () => {
     resetProgress(localStorage);
+    // Reset covers the share state too: no stale Board or invalid banner
+    // survives starting over (#16). Shared play itself is stateless.
+    clearShareHash();
+    setSharedInvalid(false);
     setCompleted(loadPackProgress(localStorage, PACKS));
     setStars(loadPackStars(localStorage, PACKS));
     setSettings(createDefaultSettings());

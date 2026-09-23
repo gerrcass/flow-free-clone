@@ -74,6 +74,14 @@ describe('share-via-URL in the App shell (#16)', () => {
     await waitFor(() => expect(screen.getByRole('grid')).toBeTruthy());
   });
 
+  it('exits the shared Board when the hash is cleared', async () => {
+    openAppWithHash(buildShareHash(FIXTURE_LEVEL));
+    expect(screen.getByRole('grid')).toBeTruthy();
+    window.location.hash = '';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(screen.queryByRole('grid')).toBeNull());
+  });
+
   it('copies a round-tripping share URL from a Pack Level', async () => {
     const writeText = vi.fn(async (_text: string) => {});
     vi.stubGlobal('navigator', {
