@@ -16,17 +16,20 @@ export const DISPLAY_FONT_FAMILY = 'Pipe Trails Display';
 export const DISPLAY_FONT_FILE = 'fonts/baloo-2-latin.woff2';
 
 /**
- * Original 8-Color palette keyed by Pack Color id.
- * Chosen for separation on dark Cells (min ~25° hue distance between any
- * two Colors); not sampled from any existing game.
+ * Retuned 8-Color palette keyed by Pack Color id (#13).
+ * Every Color holds >=4:1 contrast against the dark Cell fill (#262933)
+ * with >=25° hue distance between any two Colors; identities unchanged
+ * from the original set, brightened where the old values dipped (B, P,
+ * O, M, R) so open Pipes stay legible next to the white Endpoint rings.
+ * Not sampled from any existing game.
  */
 export const PALETTE: Record<string, string> = {
-  R: '#ef476f',
+  R: '#f2557a',
   G: '#06d6a0',
-  B: '#3a86ff',
+  B: '#5b9bff',
   Y: '#ffe66d',
-  P: '#9b5de5',
-  O: '#f3722c',
+  P: '#b388ff',
+  O: '#f97f2e',
   C: '#a3e635',
-  M: '#d946ef',
+  M: '#e052f5',
 };

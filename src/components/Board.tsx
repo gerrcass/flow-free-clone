@@ -6,6 +6,7 @@ import type { CellPos } from '../game/types';
 import { samePos } from '../game/cells';
 import { DrawSession } from '../game/drawSession';
 import { PALETTE } from '../game/theme';
+import { isConnected } from '../game/win';
 import './Board.css';
 
 interface BoardProps {
@@ -88,6 +89,13 @@ export default function Board({ state, dispatch }: BoardProps) {
           const at = { row, col };
           const endpoint = endpointAt(state, at);
           const occupant = occupantOf(state, at);
+          // Connected-Pipe styling (#13): a Pipe reads connected only
+          // through the win-check seam, so Board color never disagrees
+          // with the HUD dots or the solved state.
+          const occupantConnected =
+            occupant !== null && isConnected(state.level, occupant, state.pipes);
+          const endpointConnected =
+            endpoint !== null && isConnected(state.level, endpoint, state.pipes);
           return (
             <div
               key={`${row},${col}`}
@@ -109,13 +117,19 @@ export default function Board({ state, dispatch }: BoardProps) {
             >
               {occupant !== null && (
                 <span
-                  className="pipe"
+                  className={
+                    occupantConnected ? 'pipe pipe-connected' : 'pipe pipe-open'
+                  }
                   style={{ backgroundColor: PALETTE[occupant] ?? '#999' }}
                 />
               )}
               {endpoint !== null && (
                 <span
-                  className="endpoint"
+                  className={
+                    endpointConnected
+                      ? 'endpoint endpoint-connected'
+                      : 'endpoint endpoint-open'
+                  }
                   style={{ backgroundColor: PALETTE[endpoint] ?? '#999' }}
                 />
               )}

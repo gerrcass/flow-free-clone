@@ -22,7 +22,7 @@ import {
 import type { ContinueTarget, PackProgress, PackStars, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
-import { fillRatio, isSolved } from './game/win';
+import { fillRatio, isConnected, isSolved } from './game/win';
 import './App.css';
 
 type Route =
@@ -52,6 +52,16 @@ function PlayLevel({
   );
   const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
   const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
+  // Per-Color HUD dots (#13) share the win-check seam with Board
+  // connected styling, so dots, Pipes, and solved state never disagree.
+  const colorStatuses = useMemo(
+    () =>
+      state.level.colors.map((c) => ({
+        id: c.id,
+        connected: isConnected(state.level, c.id, state.pipes),
+      })),
+    [state],
+  );
   // Solver-derived Par and stars for this Level (#14): a single solver
   // run per Level, memoized for the Level's lifetime (~ms on shipped
   // Boards). PACKS is module-static, so pack id + index pin the Level.
@@ -79,7 +89,7 @@ function PlayLevel({
 
   return (
     <section aria-label={`${pack.name} Level ${levelNumber}`}>
-      <Hud fillPercent={Math.round(fill * 100)} par={par} stars={earnedStars} />
+      <Hud fillPercent={Math.round(fill * 100)} par={par} stars={earnedStars} colors={colorStatuses} />
       <Board state={state} dispatch={dispatch} />
       {solved && (
         <WinOverlay

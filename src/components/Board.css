@@ -24,13 +24,39 @@
 .cell .pipe {
   position: absolute;
   inset: 12%;
-  border-radius: 6px;
+  border-radius: 999px;
   opacity: 0.75;
+}
+
+/* Connected-Pipe styling (#13): connected Pipes read solid and rounded
+ * with a soft glow in their own Color; open Pipes stay dimmer and
+ * slimmer so the unfinished Color is obvious at a glance. */
+.cell .pipe-connected {
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+}
+
+.cell .pipe-open {
+  opacity: 0.55;
+  inset: 20%;
 }
 
 .cell .endpoint {
   position: absolute;
   inset: 22%;
   border-radius: 50%;
+}
+
+/* Endpoint rings (#13): open Endpoints keep the white halo; connected
+ * Endpoints fill the ring with their own Color over a bright rim so the
+ * solved Color reads as sealed. */
+.cell .endpoint-open {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
+.cell .endpoint-connected {
+  inset: 16%;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 10px rgba(255, 255, 255, 0.45);
 }
