@@ -2,10 +2,7 @@
  * Reproducible Pack emitter (ticket #2).
  *
  * Regenerates src/game/pack.ts from the seeded generator:
- *   1. npx tsc scripts/generate-pack.ts src/game/generator.ts src/game/types.ts \
- *        --outDir /tmp/packgen --module commonjs --target es2022 --skipLibCheck
- *   2. node /tmp/packgen/scripts/generate-pack.js
- *   3. npm run generate-pack  (once wired in package.json)
+ *   npm run generate-pack
  *
  * Output is deterministic: same PACK_SEED always yields the same file.
  */

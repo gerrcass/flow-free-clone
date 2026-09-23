@@ -51,8 +51,13 @@ function straightRow(r: number, size: number): CellPos[] {
  * corners; the comb ends on the top corners (even widths) or a diagonal
  * (odd widths). Same-side/diagonal corners on odd/even widths admit no
  * Hamiltonian path (checkerboard parity), so those pairings are excluded.
+ *
+ * Variants: 0 = straight (top row L->R, bottom row R->L),
+ * 1 = S-snake, 2 = comb, 3 = mirrored comb.
  */
-function snakeBand(r: number, size: number, variant: number): CellPos[] {
+export type SnakeVariant = 0 | 1 | 2 | 3;
+
+function snakeBand(r: number, size: number, variant: SnakeVariant): CellPos[] {
   const top = straightRow(r, size);
   const bottom = straightRow(r + 1, size);
   if (variant === 1) {
@@ -79,7 +84,7 @@ function snakeBand(r: number, size: number, variant: number): CellPos[] {
   return [...top, ...bottom.reverse()];
 }
 
-function snakeVariants(size: number): number[] {
+function snakeVariants(size: number): SnakeVariant[] {
   return size % 2 === 1 ? [0, 1, 2, 3] : [0, 1, 2];
 }
 

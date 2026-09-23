@@ -161,8 +161,13 @@ function startNext(s: Search, colorIdx: number): boolean {
 }
 
 /**
- * Prove a Level completable under the win-check contract: find one Pipe per
- * Color so that every Cell is filled and every Color is connected. Returns
+ * Prove a Level completable under the win-check contract (the 5-rule
+ * contract enforced by isSolved/isConnected in win.ts):
+ * 1. every Board Cell is filled, 2. no two Pipes overlap,
+ * 3. each Pipe connects its Color's two Endpoints,
+ * 4. consecutive Pipe Cells are orthogonally adjacent,
+ * 5. no Pipe crosses a rival Color's Endpoint.
+ * Find one Pipe per Color satisfying all five. Returns
  * the Pipes, or null when no solution exists within the step budget.
  */
 export function solveLevel(
