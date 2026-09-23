@@ -7,6 +7,7 @@ import { samePos } from '../game/cells';
 import { DrawSession } from '../game/drawSession';
 import { colorHex } from '../game/theme';
 import { isBoardColorConnected } from '../game/win';
+import { connectedClass } from './connectedClass';
 import './Board.css';
 
 interface BoardProps {
@@ -117,19 +118,13 @@ export default function Board({ state, dispatch }: BoardProps) {
             >
               {occupant !== null && (
                 <span
-                  className={
-                    occupantConnected ? 'pipe pipe-connected' : 'pipe pipe-open'
-                  }
+                  className={connectedClass('pipe', occupantConnected)}
                   style={{ backgroundColor: colorHex(occupant) }}
                 />
               )}
               {endpoint !== null && (
                 <span
-                  className={
-                    endpointConnected
-                      ? 'endpoint endpoint-connected'
-                      : 'endpoint endpoint-open'
-                  }
+                  className={connectedClass('endpoint', endpointConnected)}
                   style={{ backgroundColor: colorHex(endpoint) }}
                 />
               )}

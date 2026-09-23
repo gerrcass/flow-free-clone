@@ -1,5 +1,7 @@
+import { useId } from 'react';
 import { formatStars } from '../game/challenge';
 import { colorHex, type ColorId } from '../game/theme';
+import { connectedClass } from './connectedClass';
 
 export interface HudColorStatus {
   id: ColorId;
@@ -16,12 +18,13 @@ interface HudProps {
 /**
  * In-Level HUD (#13, #14): fill percent stays the primary signal, with the
  * solver-derived Par, the earned star slot, and one dot per Color carrying
- * its connected state beside it. Dots render as a list whose items expose
- * "R connected" / "G not connected" twice: an explicit label plus visible
- * text with a visually-hidden status word, so the state survives even
- * where the item label is ignored and color is never the only signal.
+ * its connected state beside it. Each dot is named by explicit
+ * `aria-labelledby` over its own visible id text plus a visually-hidden
+ * status word: a single naming source, no `aria-label` on the item, no
+ * hidden text, and color is never the only signal.
  */
 export default function Hud({ fillPercent, par, stars, colors = [] }: HudProps) {
+  const labelBase = useId();
   return (
     <div className="hud">
       <p
@@ -33,23 +36,27 @@ export default function Hud({ fillPercent, par, stars, colors = [] }: HudProps) 
       </p>
       {colors.length > 0 && (
         <ul className="hud-colors" aria-label="Colors">
-          {colors.map((color) => (
-            <li
-              key={color.id}
-              aria-label={`${color.id} ${color.connected ? 'connected' : 'not connected'}`}
-              className={color.connected ? 'hud-dot hud-dot-connected' : 'hud-dot'}
-            >
-              <span
-                aria-hidden="true"
-                className="hud-dot-swatch"
-                style={{ backgroundColor: colorHex(color.id) }}
-              />
-              {color.id}{' '}
-              <span className="visually-hidden">
-                {color.connected ? 'connected' : 'not connected'}
-              </span>
-            </li>
-          ))}
+          {colors.map((color) => {
+            const nameId = `${labelBase}-${color.id}-name`;
+            const statusId = `${labelBase}-${color.id}-status`;
+            return (
+              <li
+                key={color.id}
+                aria-labelledby={`${nameId} ${statusId}`}
+                className={connectedClass('hud-dot', color.connected)}
+              >
+                <span
+                  aria-hidden="true"
+                  className="hud-dot-swatch"
+                  style={{ backgroundColor: colorHex(color.id) }}
+                />
+                <span id={nameId}>{color.id}</span>{' '}
+                <span id={statusId} className="visually-hidden">
+                  {color.connected ? 'connected' : 'not connected'}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

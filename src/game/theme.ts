@@ -21,7 +21,8 @@ export type ColorId = string;
 /**
  * Retuned 8-Color palette keyed by Pack Color id (#13).
  * Every Color holds >=4:1 contrast against the dark Cell fill (#262933)
- * with >=20° hue distance between any two Colors; identities unchanged
+ * with >=25° hue distance between any two Colors (tightest pair Y/O at
+ * ~26°); identities unchanged
  * from the original set, brightened where the old values dipped (B, P,
  * O, M, R) so open Pipes stay legible next to the white Endpoint rings.
  * Not sampled from any existing game.

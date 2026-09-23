@@ -151,8 +151,7 @@ describe('palette legible on dark Cells (#13)', () => {
     }
   });
 
-  it('keeps every Color pair hue-separated so neighbors stay distinct', () => {
-    const hueOf = (hex: string): number => {
+  it('keeps every Color pair hue-separated so neighbors stay distinct', () => {    const hueOf = (hex: string): number => {
       const r = parseInt(hex.slice(1, 3), 16) / 255;
       const g = parseInt(hex.slice(3, 5), 16) / 255;
       const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -176,7 +175,31 @@ describe('palette legible on dark Cells (#13)', () => {
         minDistance = Math.min(minDistance, distance);
       }
     }
-    expect(minDistance).toBeGreaterThanOrEqual(20);
+    expect(minDistance).toBeGreaterThanOrEqual(25);
+  });
+
+  it('proves the contrast math against the shipped Cell fill, not an assumption', () => {
+    // The >=4:1 loop above assumes Cells paint #262933: pin that
+    // assumption to the parsed Board.css rule so a restyle that darkens
+    // or lightens Cells breaks this test instead of silently voiding
+    // the legibility claim. (jsdom has no paint engine, so computed
+    // contrast is unassertable; palette-in-DOM plus fill-in-stylesheet
+    // is the strongest rendered check available.)
+    const style = document.createElement('style');
+    style.textContent = readFile('src/components/Board.css');
+    document.head.appendChild(style);
+    const sheet = style.sheet;
+    if (!sheet) throw new Error('Board.css did not parse into a stylesheet');
+    const cellRule = Array.from(sheet.cssRules).find(
+      (candidate) =>
+        candidate.type === CSSRule.STYLE_RULE &&
+        (candidate as CSSStyleRule).selectorText === '.cell',
+    ) as CSSStyleRule | undefined;
+    // Stylesheet normalizes #262933 to rgb(38, 41, 51): same pin, either
+    // form breaks on a Cell restyle.
+    expect(cellRule?.style.getPropertyValue('background')).toContain(
+      'rgb(38, 41, 51)',
+    );
   });
 });
 
@@ -281,5 +304,26 @@ describe('toggles respected across surfaces (#13)', () => {
       name: 'Sound',
     }) as HTMLInputElement;
     expect(selectSound.checked).toBe(false);
+  });
+
+  it('carries the Animation toggle from Welcome into Level select', () => {
+    render(<App />);
+    // Toggle-gated hero rise on Welcome (motion detail itself lives in
+    // Welcome.test.tsx): off drops the animated class here.
+    expect(
+      document.querySelector('.welcome-hero.welcome-animated'),
+    ).toBeTruthy();
+    const welcomeAnimation = screen.getByRole('checkbox', {
+      name: 'Animation',
+    }) as HTMLInputElement;
+    fireEvent.click(welcomeAnimation);
+    expect(
+      document.querySelector('.welcome-hero.welcome-animated'),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Play Pipe Trails/ }));
+    const selectAnimation = screen.getByRole('checkbox', {
+      name: 'Animation',
+    }) as HTMLInputElement;
+    expect(selectAnimation.checked).toBe(false);
   });
 });
