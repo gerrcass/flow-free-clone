@@ -1,6 +1,9 @@
 /* Pipe Trails display face (#15, ADR 0006): Baloo 2 (SIL OFL 1.1) variable
  * latin subset, self-hosted in public/fonts and preloaded from index.html.
  * Top-level on purpose: the face must load in every color scheme.
+ * Root-absolute on purpose too: Vite rebases it against the relative base
+ * at build time (dist emits ../fonts/…, verified), while document-relative
+ * would resolve against this file's directory and break dev serving.
  * Headings and the wordmark use it; body and HUD stay on the system stack
  * so text renders even if the face fails to load. No runtime CDN fetch. */
 @font-face {

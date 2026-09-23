@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { findPackById } from '../game/pack';
+import { displayDifficulty, findPackById } from '../game/pack';
 import type { Pack } from '../game/pack';
 import {
   isUnlockedInPack,
@@ -34,26 +34,30 @@ export default function LevelSelect({
         {packs.map((pack) => {
           const count = packProgressCount(progress, pack.id);
           const selected = pack.id === active.id;
+          const difficulty = displayDifficulty(pack.difficulty);
           return (
             <button
               key={pack.id}
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-label={`${pack.name} Pack, ${pack.difficulty} Difficulty, ${count.done} of ${count.total} complete`}
+              aria-label={`${pack.name} Pack, ${difficulty} Difficulty, ${count.done} of ${count.total} complete`}
               onClick={() => setActivePackId(pack.id)}
             >
-              {pack.name} · {pack.difficulty} Difficulty · {count.done}/{count.total}
+              {pack.name} · {difficulty} Difficulty · {count.done}/{count.total}
             </button>
           );
         })}
       </div>
       <section
         role="tabpanel"
-        aria-label={`${active.name} Pack, ${active.difficulty} Difficulty, ${done} of ${total} complete`}
+        aria-label={`${active.name} Pack, ${displayDifficulty(active.difficulty)} Difficulty, ${done} of ${total} complete`}
       >
         <h2>
-          {active.name} <span aria-label={`${active.difficulty} Difficulty`}>· {active.difficulty}</span>
+          {active.name}{' '}
+          <span aria-label={`${displayDifficulty(active.difficulty)} Difficulty`}>
+            · {displayDifficulty(active.difficulty)}
+          </span>
         </h2>
         <p aria-live="polite">
           {done} of {total} complete

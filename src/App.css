@@ -14,33 +14,10 @@
   opacity: 0.8;
 }
 
-/* Welcome Screen hero (#15): the wordmark rises gently on arrival.
- * Only applied when the win-animation toggle is on; the
- * prefers-reduced-motion query below disables it unconditionally,
- * mirroring the win overlay above. */
+/* Welcome Screen hero (#15): static by design, so no animation toggle or
+ * reduced-motion handling is needed here; the win overlay above keeps both. */
 .welcome-hero {
   margin-bottom: 16px;
-}
-
-@keyframes welcome-rise {
-  from {
-    transform: translateY(8px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.welcome-animated {
-  animation: welcome-rise 0.4s ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .welcome-animated {
-    animation: none;
-  }
 }
 
 .welcome-packs {

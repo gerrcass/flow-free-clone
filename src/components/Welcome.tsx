@@ -1,7 +1,7 @@
-import { findPackById } from '../game/pack';
+import { displayDifficulty, findPackById } from '../game/pack';
 import type { Pack } from '../game/pack';
 import { findContinueTarget, packProgressCount } from '../game/progress';
-import type { PackProgress, Settings } from '../game/progress';
+import type { ContinueTarget, PackProgress, Settings } from '../game/progress';
 import { GAME_NAME } from '../game/theme';
 import SettingsControls from './SettingsControls';
 
@@ -10,18 +10,18 @@ interface WelcomeProps {
   progress: PackProgress;
   settings: Settings;
   onSettingsChange: (settings: Settings) => void;
-  /** Fresh players enter Level select; returning players jump to a Level. */
+  /** Browse Packs and Levels in Level select. */
   onPlay: () => void;
-  onContinue: (packId: string, index: number) => void;
+  onContinue: (target: ContinueTarget) => void;
   onEnterPack: (packId: string) => void;
 }
 
 /**
  * Pre-game Welcome Screen (#15, ADR 0006): brand hero, Continue resuming
- * the highest unlocked Pack/Level, Mode card (Free Play active, Time
- * Trial reserved for v3 with no logic behind it), and Pack entry into
- * Level select. Toggles live here too so accessibility settings carry
- * through from the first moment.
+ * the earliest unfinished Level in Pack order, Mode display (Free Play
+ * active, Time Trial reserved for v3 with no logic behind it), and Pack
+ * entry into Level select. Toggles live here too so accessibility settings
+ * carry through from the first moment.
  */
 export default function Welcome({
   packs,
@@ -39,9 +39,10 @@ export default function Welcome({
 
   return (
     <div className="welcome">
-      <header
-        className={settings.animation ? 'welcome-hero welcome-animated' : 'welcome-hero'}
-      >
+      {/* Static hero on purpose (#15): gating its rise on the win-overlay
+        toggle conflated two settings, so the hero carries no motion and
+        reduced-motion holds trivially here. */}
+      <header className="welcome-hero">
         <h1>{GAME_NAME}</h1>
         <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       </header>
@@ -49,7 +50,7 @@ export default function Welcome({
       {target && targetPack && (
         <button
           type="button"
-          onClick={() => onContinue(target.packId, target.index)}
+          onClick={() => onContinue(target)}
           aria-label={`Continue ${targetPack.name} Level ${target.index + 1}`}
         >
           Continue: {targetPack.name} Level {target.index + 1}
@@ -76,14 +77,15 @@ export default function Welcome({
         <ul className="welcome-packs">
           {packs.map((pack) => {
             const { done, total } = packProgressCount(progress, pack.id);
+            const difficulty = displayDifficulty(pack.difficulty);
             return (
               <li key={pack.id}>
                 <button
                   type="button"
                   onClick={() => onEnterPack(pack.id)}
-                  aria-label={`${pack.name} Pack, ${pack.difficulty} Difficulty, ${done} of ${total} complete`}
+                  aria-label={`${pack.name} Pack, ${difficulty} Difficulty, ${done} of ${total} complete`}
                 >
-                  {pack.name} · {pack.difficulty} · {done}/{total}
+                  {pack.name} · {difficulty} · {done}/{total}
                 </button>
               </li>
             );

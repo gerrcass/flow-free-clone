@@ -6,13 +6,13 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import App from '../App';
-import { PACKS } from '../game/pack';
+import { PACKS, displayDifficulty } from '../game/pack';
 import {
   PROGRESS_V2_KEY,
   emptyPackProgress,
   type PackProgress,
 } from '../game/progress';
-import { DISPLAY_FONT_FAMILY, DISPLAY_FONT_URL, GAME_NAME } from '../game/theme';
+import { DISPLAY_FONT_FAMILY, DISPLAY_FONT_FILE, GAME_NAME } from '../game/theme';
 
 const root = process.cwd();
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
@@ -114,12 +114,12 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
     for (const pack of PACKS) {
       expect(
         screen.getByRole('button', {
-          name: `${pack.name} Pack, ${pack.difficulty} Difficulty, 0 of 10 complete`,
+          name: `${pack.name} Pack, ${displayDifficulty(pack.difficulty)} Difficulty, 0 of 10 complete`,
         }),
       ).toBeTruthy();
     }
     fireEvent.click(
-      screen.getByRole('button', { name: /Classic Pack, classic Difficulty/ }),
+      screen.getByRole('button', { name: /Classic Pack, Classic Difficulty/ }),
     );
     const tab = screen.getByRole('tab', { name: /Classic Pack/ });
     expect(tab.getAttribute('aria-selected')).toBe('true');
@@ -128,23 +128,21 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
     ).toBeTruthy();
   });
 
-  it('carries the settings toggles and gates hero motion on the animation toggle', () => {
+  it('carries the settings toggles; the static hero needs no motion gating', () => {
     render(<App />);
     expect(
       screen.getByRole('checkbox', { name: 'Sound' }) as HTMLInputElement,
     ).toHaveProperty('checked', true);
+    expect(
+      screen.getByRole('checkbox', { name: 'Win animation' }),
+    ).toBeTruthy();
+    // Static hero by design: no animation class, so nothing to gate or
+    // reduce here; the win overlay keeps its own toggle + media query.
     const hero = document.querySelector('.welcome-hero');
-    expect(hero?.className).toContain('welcome-animated');
-
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Animation' }));
-    expect(document.querySelector('.welcome-hero')?.className).not.toContain(
-      'welcome-animated',
-    );
+    expect(hero?.className).not.toContain('animated');
 
     const css = read('src/App.css');
-    expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.welcome-animated[\s\S]*animation: none/,
-    );
+    expect(css).not.toContain('welcome-animated');
   });
 
   it('reads Pack entry in the rounded display face', () => {
@@ -156,14 +154,19 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
 describe('Welcome type system and brand (#15)', () => {
   it('preloads the self-hosted display face with a system fallback and no CDN fetch', () => {
     const html = read('index.html');
-    expect(html).toContain(`href="${DISPLAY_FONT_URL}"`);
+    // Document-relative, never root-absolute: holds under subpath hosting.
+    expect(html).toContain(`href="./${DISPLAY_FONT_FILE}"`);
+    expect(html).not.toContain('href="/fonts/');
     expect(html).toMatch(/<link[^>]*rel="preload"[^>]*as="font"[^>]*>/);
     expect(html).toMatch(/<link[^>]*type="font\/woff2"[^>]*crossorigin[^>]*>/);
-    expect(existsSync(join(root, 'public', DISPLAY_FONT_URL))).toBe(true);
+    expect(existsSync(join(root, 'public', DISPLAY_FONT_FILE))).toBe(true);
 
     const css = read('src/index.css');
     expect(css).toContain(`font-family: '${DISPLAY_FONT_FAMILY}'`);
-    expect(css).toContain(DISPLAY_FONT_URL);
+    // Root-absolute in CSS source on purpose: Vite rebases it against the
+    // relative base at build time (dist emits ../fonts/…, verified), while
+    // a document-relative URL would resolve against this file's directory.
+    expect(css).toContain(`url('/${DISPLAY_FONT_FILE}')`);
     expect(css).toContain('font-display: swap');
     // Top-level on purpose: nesting the face inside a color-scheme query
     // would silently drop the display face in the other scheme.

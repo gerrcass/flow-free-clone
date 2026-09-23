@@ -21,7 +21,7 @@ import './App.css';
 
 type Route =
   | { name: 'welcome' }
-  | { name: 'select'; packId?: string }
+  | { name: 'level-select'; packId?: string }
   | { name: 'level'; selection: ContinueTarget };
 
 function PlayLevel({
@@ -146,14 +146,12 @@ function App() {
           progress={completed}
           settings={settings}
           onSettingsChange={setSettings}
-          onPlay={() => setRoute({ name: 'select' })}
-          onContinue={(packId, index) =>
-            setRoute({ name: 'level', selection: { packId, index } })
-          }
-          onEnterPack={(packId) => setRoute({ name: 'select', packId })}
+          onPlay={() => setRoute({ name: 'level-select' })}
+          onContinue={(target) => setRoute({ name: 'level', selection: target })}
+          onEnterPack={(packId) => setRoute({ name: 'level-select', packId })}
         />
       )}
-      {route.name === 'select' && (
+      {route.name === 'level-select' && (
         <>
           <LevelSelect
             key={route.packId ?? 'all'}
@@ -166,7 +164,7 @@ function App() {
           />
           <SettingsControls settings={settings} onChange={setSettings} />
           <button type="button" onClick={() => setRoute({ name: 'welcome' })}>
-            Welcome
+            Welcome Screen
           </button>{' '}
           <button type="button" onClick={handleReset}>
             Reset progress
@@ -180,7 +178,7 @@ function App() {
           settings={settings}
           onWin={handleWin}
           onExit={() =>
-            setRoute({ name: 'select', packId: route.selection.packId })
+            setRoute({ name: 'level-select', packId: route.selection.packId })
           }
           onNext={() => {
             // Winning just completed `selection`, so the next Level in this
@@ -196,7 +194,7 @@ function App() {
                       index: route.selection.index + 1,
                     },
                   }
-                : { name: 'select', packId: pack.id },
+                : { name: 'level-select', packId: pack.id },
             );
           }}
         />
