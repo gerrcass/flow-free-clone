@@ -8,6 +8,12 @@ import WinOverlay from './components/WinOverlay';
 import { computePar, starsForPar } from './game/challenge';
 import { PACKS, findPackById } from './game/pack';
 import {
+  SHARE_HASH_PREFIX,
+  copyShareLink,
+  loadSharedLevelFromHash,
+} from './game/share';
+import type { Level } from './game/types';
+import {
   completeLevel,
   createDefaultSettings,
   emptyPackStars,
@@ -28,7 +34,68 @@ import './App.css';
 type Route =
   | { name: 'welcome' }
   | { name: 'level-select'; packId?: string }
-  | { name: 'level'; selection: ContinueTarget };
+  | { name: 'level'; selection: ContinueTarget }
+  | { name: 'shared'; level: Level };
+
+function SharedPlay({
+  level,
+  settings,
+  onExit,
+  onReset,
+}: {
+  level: Level;
+  settings: Settings;
+  onExit: () => void;
+  onReset: () => void;
+}) {
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    createInitialState(level),
+  );
+  const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
+  const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
+  const colorStatuses = useMemo(
+    () =>
+      state.level.colors.map((c) => ({
+        id: c.id,
+        connected: isBoardColorConnected(state, c.id),
+      })),
+    [state],
+  );
+  const par = useMemo(() => computePar(level), [level]);
+  const [copied, setCopied] = useState(false);
+  const wasSolved = useRef(false);
+
+  useEffect(() => {
+    if (solved && !wasSolved.current) playWinSound({ enabled: settings.sound });
+    wasSolved.current = solved;
+  }, [solved, settings.sound]);
+
+  return (
+    <section aria-label="Shared Level">
+      <Hud fillPercent={Math.round(fill * 100)} par={par} stars={0} colors={colorStatuses} />
+      <Board state={state} dispatch={dispatch} />
+      {solved ? (
+        <p role="status">
+          Shared Level complete: every Cell filled and every Color connected.
+        </p>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => {
+          void copyShareLink(level).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Link copied' : 'Share Level'}
+      </button>{' '}
+      <button type="button" onClick={onExit}>
+        Welcome Screen
+      </button>{' '}
+      <button type="button" onClick={onReset}>
+        Reset progress
+      </button>
+    </section>
+  );
+}
 
 function PlayLevel({
   selection,
@@ -72,6 +139,8 @@ function PlayLevel({
   );
   const starsAvailable = par === null ? null : starsForPar(par);
   const hasNext = selection.index + 1 < pack.levels.length;
+  const [copied, setCopied] = useState(false);
+  const shareLevel = pack.levels[selection.index];
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
   const wasSolved = useRef(false);
@@ -106,7 +175,15 @@ function PlayLevel({
         <button type="button" onClick={onExit}>
           Level select
         </button>
-      )}
+      )}{' '}
+      <button
+        type="button"
+        onClick={() => {
+          void copyShareLink(shareLevel).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Link copied' : 'Share Level'}
+      </button>
     </section>
   );
 }
@@ -129,8 +206,50 @@ function readSettings() {
   return loadSettings(localStorage);
 }
 
+/**
+ * One bundle for the share fragment read (#16): the route plus whether
+ * the fragment was a bad share link. Both travel together from the single
+ * mount-time parse.
+ */
+interface HashRoute {
+  route: Route;
+  invalid: boolean;
+}
+
+/** Read the current location hash as a shared Level route (#16). */
+function readSharedRoute(): HashRoute {
+  try {
+    const hash = window.location.hash;
+    if (!hash.startsWith(SHARE_HASH_PREFIX)) return { route: { name: 'welcome' }, invalid: false };
+    const level = loadSharedLevelFromHash(hash);
+    if (level === null) return { route: { name: 'welcome' }, invalid: true };
+    return { route: { name: 'shared', level }, invalid: false };
+  } catch {
+    // A throwing read means the fragment claimed to be a share link but
+    // could not be verified: surface the invalid-link alert, never a
+    // silent Welcome.
+    return { route: { name: 'welcome' }, invalid: true };
+  }
+}
+
+/** Clear the share fragment so a plain reload returns to Welcome. */
+function clearShareHash(): void {
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch {
+    // Non-browser/test env: nothing to clear.
+  }
+}
+
 function App() {
-  const [route, setRoute] = useState<Route>({ name: 'welcome' });
+  // One hash parse per mount: the Solver-seam verify inside is the
+  // expensive part, so route and invalid flag share a single read.
+  const [initialRoute] = useState<HashRoute>(() => {
+    if (typeof window === 'undefined') return { route: { name: 'welcome' }, invalid: false };
+    return readSharedRoute();
+  });
+  const [route, setRoute] = useState<Route>(initialRoute.route);
+  const [sharedInvalid, setSharedInvalid] = useState(initialRoute.invalid);
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
   const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
@@ -154,14 +273,46 @@ function App() {
 
   const handleReset = () => {
     resetProgress(localStorage);
+    // Reset covers the share state too: no stale Board or invalid banner
+    // survives starting over (#16). Shared play itself is stateless.
+    clearShareHash();
+    setSharedInvalid(false);
     setCompleted(loadPackProgress(localStorage, PACKS));
     setStars(loadPackStars(localStorage, PACKS));
     setSettings(createDefaultSettings());
     setRoute({ name: 'welcome' });
   };
 
+  const exitShared = () => {
+    clearShareHash();
+    setSharedInvalid(false);
+    setRoute({ name: 'welcome' });
+  };
+
   return (
     <main className="app">
+      {sharedInvalid && (
+        <p role="alert">
+          That shared Level link is invalid or unsolvable.{' '}
+          <button
+            type="button"
+            onClick={() => {
+              clearShareHash();
+              setSharedInvalid(false);
+            }}
+          >
+            Dismiss
+          </button>
+        </p>
+      )}
+      {route.name === 'shared' && (
+        <SharedPlay
+          level={route.level}
+          settings={settings}
+          onExit={exitShared}
+          onReset={handleReset}
+        />
+      )}
       {route.name === 'welcome' && (
         <Welcome
           packs={PACKS}
