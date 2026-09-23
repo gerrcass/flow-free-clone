@@ -8,6 +8,7 @@ import {
   emptyPackProgress,
   groupBySize,
   isUnlocked,
+  isUnlockedInPack,
   loadPackProgress,
   loadProgress,
   loadSettings,
@@ -127,11 +128,11 @@ describe('per-Pack unlock (#12)', () => {
   it('keeps unlock sequential within each Pack independently', () => {
     const starter = [true, true, false];
     const classic = [false, false, false];
-    expect(isUnlocked(starter, 2)).toBe(true);
+    expect(isUnlockedInPack(starter, 2)).toBe(true);
     // Finishing Starter never unlocks Classic beyond its own first Level
-    expect(isUnlocked(classic, 0)).toBe(true);
-    expect(isUnlocked(classic, 1)).toBe(false);
-    expect(isUnlocked(classic, 2)).toBe(false);
+    expect(isUnlockedInPack(classic, 0)).toBe(true);
+    expect(isUnlockedInPack(classic, 1)).toBe(false);
+    expect(isUnlockedInPack(classic, 2)).toBe(false);
   });
 
   it('reports per-Pack done/total counts for progress indication', () => {
@@ -190,6 +191,49 @@ describe('v1-to-v2 migration (#12)', () => {
       [PROGRESS_KEY]: JSON.stringify([true, ...Array(29).fill(false)]),
     });
     expect(loadPackProgress(storage, PACKS).starter[0]).toBe(true);
+  });
+
+  it('pads/truncates v2 Pack arrays from an older Pack size instead of discarding them', () => {
+    const short = emptyPackProgress(PACKS);
+    short.starter = [true, ...Array(7).fill(false)];
+    short.classic = [...Array(12).fill(true)];
+    const storage = memStorage({
+      [PROGRESS_V2_KEY]: JSON.stringify({ version: 2, completed: short }),
+      [PROGRESS_KEY]: JSON.stringify(Array(30).fill(false)),
+    });
+    const loaded = loadPackProgress(storage, PACKS);
+    expect(loaded.starter).toEqual([true, ...Array(9).fill(false)]);
+    expect(loaded.classic).toEqual(Array(10).fill(true));
+    expect(loaded.expert).toEqual(Array(10).fill(false));
+  });
+
+  it('treats v2 Pack arrays with non-boolean entries as corrupt', () => {
+    const storage = memStorage({
+      [PROGRESS_V2_KEY]: JSON.stringify({
+        version: 2,
+        completed: { starter: ['yes', ...Array(9).fill(false)] },
+      }),
+      [PROGRESS_KEY]: JSON.stringify([true, ...Array(29).fill(false)]),
+    });
+    expect(loadPackProgress(storage, PACKS).starter[0]).toBe(true);
+  });
+
+  it('persists the migrated v2 store when falling back to legacy', () => {
+    const storage = memStorage({
+      [PROGRESS_KEY]: JSON.stringify([true, ...Array(29).fill(false)]),
+    });
+    const loaded = loadPackProgress(storage, PACKS);
+    const raw = storage.peek()[PROGRESS_V2_KEY];
+    expect(raw).toBeDefined();
+    expect((JSON.parse(raw as string) as { completed: unknown }).completed).toEqual(
+      loaded,
+    );
+  });
+
+  it('writes nothing when there is no legacy store to migrate', () => {
+    const empty = memStorage();
+    loadPackProgress(empty, PACKS);
+    expect(empty.peek()[PROGRESS_V2_KEY]).toBeUndefined();
   });
 
   it('falls back to empty progress when both stores are missing or corrupt', () => {

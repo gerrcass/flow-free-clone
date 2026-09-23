@@ -136,9 +136,12 @@ function readLegacyFlat(storage: StorageLike): boolean[] | null {
 
 function normalizePackArray(value: unknown, length: number): boolean[] | null {
   if (!Array.isArray(value)) return null;
-  if (value.length !== length) return null;
   if (!value.every((c) => typeof c === 'boolean')) return null;
-  return [...value];
+  // Tolerate Pack-size drift the same way migration does: pad short
+  // arrays with locked Levels, truncate long ones, so a v2 store from
+  // an older Pack size keeps its valid progress instead of being
+  // discarded in favor of stale legacy data.
+  return Array.from({ length }, (_, i) => value[i] === true);
 }
 
 function readV2(storage: StorageLike, packs: PackLike[]): PackProgress | null {
@@ -170,7 +173,9 @@ function readV2(storage: StorageLike, packs: PackLike[]): PackProgress | null {
 /**
  * Load the per-Pack progress map (#12). Prefers the v2 store; falls back
  * to one-way migration of the legacy flat store when v2 is missing or
- * corrupt; falls back to empty (all locked) when both are unusable.
+ * corrupt, persisting the migrated map back to v2 so migration happens
+ * once instead of on every load; falls back to empty (all locked) when
+ * both are unusable.
  */
 export function loadPackProgress(
   storage: StorageLike,
@@ -179,7 +184,11 @@ export function loadPackProgress(
   const v2 = readV2(storage, packs);
   if (v2 !== null) return v2;
   const legacy = readLegacyFlat(storage);
-  if (legacy !== null) return migrateLegacyProgress(legacy, packs);
+  if (legacy !== null) {
+    const migrated = migrateLegacyProgress(legacy, packs);
+    savePackProgress(storage, migrated);
+    return migrated;
+  }
   return emptyPackProgress(packs);
 }
 
