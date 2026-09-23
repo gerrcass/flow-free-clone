@@ -84,21 +84,38 @@ export function saveProgress(storage: StorageLike, completed: boolean[]): void {
   storage.setItem(PROGRESS_KEY, JSON.stringify(completed));
 }
 
-export function emptyPackProgress(packs: PackLike[]): PackProgress {
-  const out: PackProgress = {};
+/** One per-Pack array per Pack id, sharing the Pack-shape walk (#14). */
+function packArrays<T>(packs: PackLike[], fill: T): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
   for (const pack of packs) {
-    out[pack.id] = Array.from({ length: pack.levels.length }, () => false);
+    out[pack.id] = Array.from({ length: pack.levels.length }, () => fill);
   }
   return out;
 }
 
+export function emptyPackProgress(packs: PackLike[]): PackProgress {
+  return packArrays(packs, false);
+}
+
 /** All-zero stars matching each Pack shape (#14). */
 export function emptyPackStars(packs: PackLike[]): PackStars {
-  const out: PackStars = {};
-  for (const pack of packs) {
-    out[pack.id] = Array.from({ length: pack.levels.length }, () => 0);
-  }
-  return out;
+  return packArrays(packs, 0);
+}
+
+/**
+ * Fit a raw array to a Pack length: coerce present entries, pad short
+ * arrays with the fallback, truncate long ones. Shared by completion
+ * and stars normalization, whose validity rules stay distinct below.
+ */
+function fitArrayLength<T>(
+  arr: unknown[],
+  length: number,
+  fallback: T,
+  coerce: (entry: unknown) => T,
+): T[] {
+  return Array.from({ length }, (_, i) =>
+    i < arr.length ? coerce(arr[i]) : fallback,
+  );
 }
 
 /**
@@ -109,12 +126,11 @@ export function emptyPackStars(packs: PackLike[]): PackStars {
  */
 function normalizeStarArray(value: unknown, length: number): number[] {
   const arr = Array.isArray(value) ? value : [];
-  return Array.from({ length }, (_, i) => {
-    const entry = arr[i];
-    return Number.isInteger(entry) && (entry as number) >= 0 && (entry as number) <= 3
+  return fitArrayLength(arr, length, 0, (entry) =>
+    Number.isInteger(entry) && (entry as number) >= 0 && (entry as number) <= 3
       ? (entry as number)
-      : 0;
-  });
+      : 0,
+  );
 }
 
 function readRawV2Doc(storage: StorageLike): {
@@ -153,19 +169,21 @@ export function loadPackStars(storage: StorageLike, packs: PackLike[]): PackStar
 /**
  * Keep the best stars earned per Pack/Level (#14): a new result only
  * replaces the stored one when higher. Out-of-range writes return the
- * input unchanged.
+ * input unchanged. Takes the ContinueTarget bundle instead of loose
+ * pack id plus index travelling together.
  */
 export function recordStars(
   prev: PackStars,
-  packId: string,
-  index: number,
+  target: ContinueTarget,
   earned: number,
 ): PackStars {
-  const arr = prev[packId];
-  if (!Array.isArray(arr) || index < 0 || index >= arr.length) return prev;
-  if (!Number.isInteger(earned) || earned <= (arr[index] ?? 0)) return prev;
-  const next = { ...prev, [packId]: [...arr] };
-  next[packId][index] = Math.min(3, Math.max(0, earned));
+  const arr = prev[target.packId];
+  if (!Array.isArray(arr) || target.index < 0 || target.index >= arr.length) {
+    return prev;
+  }
+  if (!Number.isInteger(earned) || earned <= (arr[target.index] ?? 0)) return prev;
+  const next = { ...prev, [target.packId]: [...arr] };
+  next[target.packId][target.index] = Math.min(3, Math.max(0, earned));
   return next;
 }
 
@@ -221,7 +239,7 @@ function normalizePackArray(value: unknown, length: number): boolean[] | null {
   // arrays with locked Levels, truncate long ones, so a v2 store from
   // an older Pack size keeps its valid progress instead of being
   // discarded in favor of stale legacy data.
-  return Array.from({ length }, (_, i) => value[i] === true);
+  return fitArrayLength(value, length, false, (c) => c === true);
 }
 
 function readV2(storage: StorageLike, packs: PackLike[]): PackProgress | null {

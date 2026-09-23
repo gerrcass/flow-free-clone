@@ -41,7 +41,7 @@ function PlayLevel({
   selection: ContinueTarget;
   earnedStars: number;
   settings: Settings;
-  onWin: (packId: string, index: number, earned: number) => void;
+  onWin: (selection: ContinueTarget, earned: number) => void;
   onExit: () => void;
   onNext: () => void;
 }) {
@@ -60,15 +60,15 @@ function PlayLevel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pack.id, selection.index],
   );
-  const available = par === null ? null : starsForPar(par);
+  const starsAvailable = par === null ? null : starsForPar(par);
   const hasNext = selection.index + 1 < pack.levels.length;
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
   const wasSolved = useRef(false);
 
   useEffect(() => {
-    if (solved) onWin(pack.id, selection.index, available ?? 0);
-  }, [solved, pack.id, selection.index, available, onWin]);
+    if (solved) onWin(selection, starsAvailable ?? 0);
+  }, [solved, selection, starsAvailable, onWin]);
 
   useEffect(() => {
     // Fire only on the solving transition: flipping the sound toggle
@@ -85,7 +85,7 @@ function PlayLevel({
         <WinOverlay
           packName={pack.name}
           levelNumber={levelNumber}
-          starsEarned={available ?? 0}
+          starsEarned={starsAvailable ?? 0}
           hasNext={hasNext}
           animated={settings.animation}
           onNext={onNext}
@@ -133,13 +133,13 @@ function App() {
     saveSettings(localStorage, settings);
   }, [settings]);
 
-  const handleWin = (packId: string, index: number, earned: number) => {
+  const handleWin = (target: ContinueTarget, earned: number) => {
     setCompleted((prev) => {
-      const arr = prev[packId] ?? [];
-      if (arr[index] === true) return prev;
-      return { ...prev, [packId]: completeLevel(arr, index) };
+      const arr = prev[target.packId] ?? [];
+      if (arr[target.index] === true) return prev;
+      return { ...prev, [target.packId]: completeLevel(arr, target.index) };
     });
-    setStars((prev) => recordStars(prev, packId, index, earned));
+    setStars((prev) => recordStars(prev, target, earned));
   };
 
   const handleReset = () => {

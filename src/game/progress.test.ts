@@ -401,12 +401,13 @@ describe('stars alongside completion (#14)', () => {
 
   it('keeps the best stars per Pack/Level and ignores out-of-range writes', () => {
     const empty = emptyPackStars(PACKS);
-    const once = recordStars(empty, 'starter', 0, 1);
+    const target = { packId: 'starter', index: 0 };
+    const once = recordStars(empty, target, 1);
     expect(once.starter[0]).toBe(1);
-    expect(recordStars(once, 'starter', 0, 3).starter[0]).toBe(3);
-    expect(recordStars(once, 'starter', 0, 1).starter[0]).toBe(1);
-    expect(recordStars(once, 'unknown', 0, 3)).toEqual(once);
-    expect(recordStars(once, 'starter', 99, 3)).toEqual(once);
+    expect(recordStars(once, target, 3).starter[0]).toBe(3);
+    expect(recordStars(once, target, 1).starter[0]).toBe(1);
+    expect(recordStars(once, { packId: 'unknown', index: 0 }, 3)).toEqual(once);
+    expect(recordStars(once, { packId: 'starter', index: 99 }, 3)).toEqual(once);
   });
 
   it('clears stars on reset along with the v2 key', () => {

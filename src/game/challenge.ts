@@ -3,8 +3,6 @@ import { solveLevel } from './solver';
 
 export type Stars = 1 | 2 | 3;
 
-type SolverFn = typeof solveLevel;
-
 /**
  * Star thresholds over solver-derived Par (#14, ADR 0004): Par is the
  * total Pipe Cell count of the solver's full-fill solution, which equals
@@ -24,8 +22,8 @@ export const PAR_TWO_STAR_MAX = 49;
  * every Color). Returns null when the solver finds no solution within its
  * step budget, so unsolvable Boards never award stars.
  */
-export function computePar(level: Level, solve: SolverFn = solveLevel): number | null {
-  const pipes = solve(level);
+export function computePar(level: Level): number | null {
+  const pipes = solveLevel(level);
   if (pipes === null) return null;
   return Object.values(pipes).reduce((total, pipe) => total + pipe.length, 0);
 }
@@ -42,8 +40,8 @@ export function starsForPar(par: number): Stars {
  * mapped through the thresholds, or null when the Level has no solver
  * solution. Never changes the win-check itself (see win.ts).
  */
-export function starsForLevel(level: Level, solve: SolverFn = solveLevel): Stars | null {
-  const par = computePar(level, solve);
+export function starsForLevel(level: Level): Stars | null {
+  const par = computePar(level);
   if (par === null) return null;
   return starsForPar(par);
 }
