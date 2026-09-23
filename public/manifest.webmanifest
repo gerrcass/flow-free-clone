@@ -1,0 +1,19 @@
+{
+  "name": "Hue Trails — Free Play pipe puzzle",
+  "short_name": "Hue Trails",
+  "description": "Connect every Color, fill every Cell. Free Play, no timer.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1c1e26",
+  "theme_color": "#1c1e26",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
