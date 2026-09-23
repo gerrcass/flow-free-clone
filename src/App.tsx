@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Board from './components/Board';
+import Hud from './components/Hud';
 import LevelSelect from './components/LevelSelect';
 import SettingsControls from './components/SettingsControls';
 import Welcome from './components/Welcome';
+import WinOverlay from './components/WinOverlay';
+import { computePar, starsForPar } from './game/challenge';
 import { PACKS, findPackById } from './game/pack';
 import {
   completeLevel,
   createDefaultSettings,
+  emptyPackStars,
   loadPackProgress,
+  loadPackStars,
   loadSettings,
+  recordStars,
   resetProgress,
   savePackProgress,
   saveSettings,
 } from './game/progress';
-import type { ContinueTarget, PackProgress, Settings } from './game/progress';
+import type { ContinueTarget, PackProgress, PackStars, Settings } from './game/progress';
 import { createInitialState, reducer } from './game/reducer';
 import { playWinSound } from './game/sound';
 import { fillRatio, isSolved } from './game/win';
@@ -26,14 +32,16 @@ type Route =
 
 function PlayLevel({
   selection,
+  earnedStars,
   settings,
   onWin,
   onExit,
   onNext,
 }: {
   selection: ContinueTarget;
+  earnedStars: number;
   settings: Settings;
-  onWin: (packId: string, index: number) => void;
+  onWin: (selection: ContinueTarget, earned: number) => void;
   onExit: () => void;
   onNext: () => void;
 }) {
@@ -44,14 +52,23 @@ function PlayLevel({
   );
   const solved = useMemo(() => isSolved(state.level, state.pipes), [state]);
   const fill = useMemo(() => fillRatio(state.level, state.pipes), [state]);
+  // Solver-derived Par and stars for this Level (#14): a single solver
+  // run per Level, memoized for the Level's lifetime (~ms on shipped
+  // Boards). PACKS is module-static, so pack id + index pin the Level.
+  const par = useMemo(
+    () => computePar(pack.levels[selection.index]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pack.id, selection.index],
+  );
+  const starsAvailable = par === null ? null : starsForPar(par);
   const hasNext = selection.index + 1 < pack.levels.length;
   // PlayLevel remounts per Level, so this ref tracks the unsolved→solved
   // transition within one Level only.
   const wasSolved = useRef(false);
 
   useEffect(() => {
-    if (solved) onWin(pack.id, selection.index);
-  }, [solved, pack.id, selection.index, onWin]);
+    if (solved) onWin(selection, starsAvailable ?? 0);
+  }, [solved, selection, starsAvailable, onWin]);
 
   useEffect(() => {
     // Fire only on the solving transition: flipping the sound toggle
@@ -62,31 +79,18 @@ function PlayLevel({
 
   return (
     <section aria-label={`${pack.name} Level ${levelNumber}`}>
-      <p className="hud" aria-live="polite">
-        Filled {Math.round(fill * 100)}%
-      </p>
+      <Hud fillPercent={Math.round(fill * 100)} par={par} stars={earnedStars} />
       <Board state={state} dispatch={dispatch} />
       {solved && (
-        <div
-          className={settings.animation ? 'win-overlay win-animated' : 'win-overlay'}
-          role="dialog"
-          aria-label={`${pack.name} Level ${levelNumber} complete`}
-        >
-          <p className="win" role="status">
-            {pack.name} Level {levelNumber} complete: every Cell filled and every
-            Color connected.
-          </p>
-          {hasNext ? (
-            <button type="button" onClick={onNext}>
-              Next Level
-            </button>
-          ) : (
-            <p>Pack complete — every Level solved.</p>
-          )}
-          <button type="button" onClick={onExit}>
-            Level select
-          </button>
-        </div>
+        <WinOverlay
+          packName={pack.name}
+          levelNumber={levelNumber}
+          starsEarned={starsAvailable ?? 0}
+          hasNext={hasNext}
+          animated={settings.animation}
+          onNext={onNext}
+          onExit={onExit}
+        />
       )}
       {!solved && (
         <button type="button" onClick={onExit}>
@@ -105,6 +109,11 @@ function readProgress(): PackProgress {
   return loadPackProgress(localStorage, PACKS);
 }
 
+function readStars(): PackStars {
+  if (typeof localStorage === 'undefined') return emptyPackStars(PACKS);
+  return loadPackStars(localStorage, PACKS);
+}
+
 function readSettings() {
   if (typeof localStorage === 'undefined') return createDefaultSettings();
   return loadSettings(localStorage);
@@ -113,27 +122,30 @@ function readSettings() {
 function App() {
   const [route, setRoute] = useState<Route>({ name: 'welcome' });
   const [completed, setCompleted] = useState<PackProgress>(readProgress);
+  const [stars, setStars] = useState<PackStars>(readStars);
   const [settings, setSettings] = useState(readSettings);
 
   useEffect(() => {
-    savePackProgress(localStorage, completed);
-  }, [completed]);
+    savePackProgress(localStorage, completed, stars);
+  }, [completed, stars]);
 
   useEffect(() => {
     saveSettings(localStorage, settings);
   }, [settings]);
 
-  const handleWin = (packId: string, index: number) => {
+  const handleWin = (target: ContinueTarget, earned: number) => {
     setCompleted((prev) => {
-      const arr = prev[packId] ?? [];
-      if (arr[index] === true) return prev;
-      return { ...prev, [packId]: completeLevel(arr, index) };
+      const arr = prev[target.packId] ?? [];
+      if (arr[target.index] === true) return prev;
+      return { ...prev, [target.packId]: completeLevel(arr, target.index) };
     });
+    setStars((prev) => recordStars(prev, target, earned));
   };
 
   const handleReset = () => {
     resetProgress(localStorage);
     setCompleted(loadPackProgress(localStorage, PACKS));
+    setStars(loadPackStars(localStorage, PACKS));
     setSettings(createDefaultSettings());
     setRoute({ name: 'welcome' });
   };
@@ -175,6 +187,7 @@ function App() {
         <PlayLevel
           key={`${route.selection.packId}:${route.selection.index}`}
           selection={route.selection}
+          earnedStars={stars[route.selection.packId]?.[route.selection.index] ?? 0}
           settings={settings}
           onWin={handleWin}
           onExit={() =>

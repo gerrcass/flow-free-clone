@@ -7,6 +7,9 @@ export const SETTINGS_KEY = 'flow-free-clone:settings:v1';
 /** Per-Pack completion map keyed by Pack id (#12). */
 export type PackProgress = Record<string, boolean[]>;
 
+/** Per-Pack stars map keyed by Pack id (#14): 0-3 stars per Level. */
+export type PackStars = Record<string, number[]>;
+
 export interface PackLike {
   id: string;
   levels: Level[];
@@ -81,12 +84,107 @@ export function saveProgress(storage: StorageLike, completed: boolean[]): void {
   storage.setItem(PROGRESS_KEY, JSON.stringify(completed));
 }
 
-export function emptyPackProgress(packs: PackLike[]): PackProgress {
-  const out: PackProgress = {};
+/** One per-Pack array per Pack id, sharing the Pack-shape walk (#14). */
+function packArrays<T>(packs: PackLike[], fill: T): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
   for (const pack of packs) {
-    out[pack.id] = Array.from({ length: pack.levels.length }, () => false);
+    out[pack.id] = Array.from({ length: pack.levels.length }, () => fill);
   }
   return out;
+}
+
+export function emptyPackProgress(packs: PackLike[]): PackProgress {
+  return packArrays(packs, false);
+}
+
+/** All-zero stars matching each Pack shape (#14). */
+export function emptyPackStars(packs: PackLike[]): PackStars {
+  return packArrays(packs, 0);
+}
+
+/**
+ * Fit a raw array to a Pack length: coerce present entries, pad short
+ * arrays with the fallback, truncate long ones. Shared by completion
+ * and stars normalization, whose validity rules stay distinct below.
+ */
+function fitArrayLength<T>(
+  arr: unknown[],
+  length: number,
+  fallback: T,
+  coerce: (entry: unknown) => T,
+): T[] {
+  return Array.from({ length }, (_, i) =>
+    i < arr.length ? coerce(arr[i]) : fallback,
+  );
+}
+
+/**
+ * Lenient star-array normalization (#14): unlike completion, a bad stars
+ * entry never invalidates the whole store — non-integer or out-of-range
+ * entries read as 0, short arrays pad with 0, long ones truncate. Stars
+ * stay a best-effort chase goal next to the authoritative completion map.
+ */
+function normalizeStarArray(value: unknown, length: number): number[] {
+  const arr = Array.isArray(value) ? value : [];
+  return fitArrayLength(arr, length, 0, (entry) =>
+    Number.isInteger(entry) && (entry as number) >= 0 && (entry as number) <= 3
+      ? (entry as number)
+      : 0,
+  );
+}
+
+function readRawV2Doc(storage: StorageLike): {
+  version?: unknown;
+  completed?: unknown;
+  stars?: unknown;
+} | null {
+  try {
+    const raw = storage.getItem(PROGRESS_V2_KEY);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return parsed as { version?: unknown; completed?: unknown; stars?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load per-Pack stars (#14). Reads the `stars` field of the v2 store;
+ * missing, corrupt, or ragged entries fall back to zero stars without
+ * touching completion.
+ */
+export function loadPackStars(storage: StorageLike, packs: PackLike[]): PackStars {
+  const doc = readRawV2Doc(storage);
+  const starred = doc !== null && typeof doc.stars === 'object' && doc.stars !== null
+    ? (doc.stars as Record<string, unknown>)
+    : null;
+  const out: PackStars = {};
+  for (const pack of packs) {
+    out[pack.id] = normalizeStarArray(starred?.[pack.id], pack.levels.length);
+  }
+  return out;
+}
+
+/**
+ * Keep the best stars earned per Pack/Level (#14): a new result only
+ * replaces the stored one when higher. Out-of-range writes return the
+ * input unchanged. Takes the ContinueTarget bundle instead of loose
+ * pack id plus index travelling together.
+ */
+export function recordStars(
+  prev: PackStars,
+  target: ContinueTarget,
+  earned: number,
+): PackStars {
+  const arr = prev[target.packId];
+  if (!Array.isArray(arr) || target.index < 0 || target.index >= arr.length) {
+    return prev;
+  }
+  if (!Number.isInteger(earned) || earned <= (arr[target.index] ?? 0)) return prev;
+  const next = { ...prev, [target.packId]: [...arr] };
+  next[target.packId][target.index] = Math.min(3, Math.max(0, earned));
+  return next;
 }
 
 /** Done/total pair driving per-Pack progress indication in Level select. */
@@ -141,7 +239,7 @@ function normalizePackArray(value: unknown, length: number): boolean[] | null {
   // arrays with locked Levels, truncate long ones, so a v2 store from
   // an older Pack size keeps its valid progress instead of being
   // discarded in favor of stale legacy data.
-  return Array.from({ length }, (_, i) => value[i] === true);
+  return fitArrayLength(value, length, false, (c) => c === true);
 }
 
 function readV2(storage: StorageLike, packs: PackLike[]): PackProgress | null {
@@ -194,13 +292,30 @@ export function loadPackProgress(
 
 /**
  * Persist the per-Pack map to the v2 key only (#12). The legacy key is
- * never written here, keeping migration one-way (legacy → v2).
+ * never written here, keeping migration one-way (legacy → v2). An
+ * optional stars map (#14) is stored in the same document alongside
+ * completion; when omitted, pre-existing stars are preserved so older
+ * two-argument call sites never wipe the chase goal.
  */
 export function savePackProgress(
   storage: StorageLike,
   progress: PackProgress,
+  stars?: PackStars,
 ): void {
-  storage.setItem(PROGRESS_V2_KEY, JSON.stringify({ version: 2, completed: progress }));
+  const keep = stars ?? readRawV2DocStars(storage);
+  storage.setItem(
+    PROGRESS_V2_KEY,
+    JSON.stringify({ version: 2, completed: progress, stars: keep }),
+  );
+}
+
+/** Stars already in the v2 document, or undefined when there are none. */
+function readRawV2DocStars(storage: StorageLike): PackStars | undefined {
+  const doc = readRawV2Doc(storage);
+  if (doc === null || typeof doc.stars !== 'object' || doc.stars === null) {
+    return undefined;
+  }
+  return doc.stars as PackStars;
 }
 
 export interface ContinueTarget {
