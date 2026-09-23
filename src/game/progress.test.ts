@@ -5,7 +5,6 @@ import {
   SETTINGS_KEY,
   completeLevel,
   createDefaultSettings,
-  describePack,
   emptyPackProgress,
   findContinueTarget,
   groupBySize,
@@ -148,43 +147,32 @@ describe('per-Pack unlock (#12)', () => {
     expect(packProgressCount(progress, 'expert')).toEqual({ done: 0, total: 0 });
     expect(packProgressCount(progress, 'unknown')).toEqual({ done: 0, total: 0 });
   });
-
-  it('describes a Pack with progress and display Difficulty in one shape (#15)', () => {
-    expect(describePack({ starter: [true, false] }, PACKS[0])).toEqual({
-      done: 1,
-      total: 10,
-      difficulty: 'Starter',
-    });
-    expect(describePack({}, PACKS[1])).toEqual({
-      done: 0,
-      total: 10,
-      difficulty: 'Classic',
-    });
-  });
 });
-
-describe('continue target (#15)', () => {  const packsOf = (sizes: number[]) =>
+describe('continue target (#15)', () => {
+  const packsOf = (sizes: number[]) =>
     sizes.map((n, i) => ({ id: `pack-${i}`, levels: Array.from({ length: n }, () => levelOf(5)) }));
 
-  it('starts a fresh player at the first Level of the first Pack', () => {
+  it('returns null for a fresh player: nothing resumable yet', () => {
     const packs = packsOf([3, 2]);
-    expect(findContinueTarget(emptyPackProgress(packs), packs)).toEqual({
-      packId: 'pack-0',
-      index: 0,
-    });
+    expect(findContinueTarget(emptyPackProgress(packs), packs)).toBeNull();
   });
 
-  it('resumes the first incomplete Level of the earliest unfinished Pack', () => {
+  it('resumes the first incomplete Level of a partially played Pack', () => {
     const packs = packsOf([3, 3]);
     const progress = emptyPackProgress(packs);
     progress['pack-0'] = [true, true, false];
     expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
-    // Progress in a later Pack never jumps ahead of an earlier unfinished one.
-    progress['pack-1'] = [true, false, false];
-    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-0', index: 2 });
   });
 
-  it('advances to the next Pack once a Pack is fully complete', () => {
+  it('resumes the highest unlocked Pack/Level: furthest Pack with progress wins', () => {
+    const packs = packsOf([3, 3]);
+    const progress = emptyPackProgress(packs);
+    progress['pack-0'] = [true, false, false];
+    progress['pack-1'] = [true, false, false];
+    expect(findContinueTarget(progress, packs)).toEqual({ packId: 'pack-1', index: 1 });
+  });
+
+  it('advances past fully-complete Packs to the next Pack', () => {
     const packs = packsOf([2, 2]);
     const progress = emptyPackProgress(packs);
     progress['pack-0'] = [true, true];
@@ -202,7 +190,7 @@ describe('continue target (#15)', () => {  const packsOf = (sizes: number[]) =>
   it('returns null with no Packs and tolerates ragged progress arrays', () => {
     expect(findContinueTarget({}, [])).toBeNull();
     const packs = packsOf([3]);
-    expect(findContinueTarget({}, packs)).toEqual({ packId: 'pack-0', index: 0 });
+    expect(findContinueTarget({}, packs)).toBeNull();
     expect(findContinueTarget({ 'pack-0': [true] }, packs)).toEqual({
       packId: 'pack-0',
       index: 1,

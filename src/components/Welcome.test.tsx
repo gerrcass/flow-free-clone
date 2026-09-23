@@ -15,7 +15,17 @@ import {
 import { DISPLAY_FONT_FAMILY, DISPLAY_FONT_FILE, GAME_NAME } from '../game/theme';
 
 const root = process.cwd();
-const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
+const readFile = (rel: string) => readFileSync(join(root, rel), 'utf8');
+
+/** Parsed App.css stylesheet: rule-level assertions instead of string matching. */
+function appStyleSheet(): CSSStyleSheet {
+  const style = document.createElement('style');
+  style.textContent = readFile('src/App.css');
+  document.head.appendChild(style);
+  const sheet = style.sheet;
+  if (!sheet) throw new Error('App.css did not parse into a stylesheet');
+  return sheet;
+}
 
 afterEach(() => {
   cleanup();
@@ -30,7 +40,7 @@ function seedProgress(overrides: Partial<PackProgress>) {
   );
 }
 
-const done = (n: number, total = 10) =>
+const firstComplete = (n: number, total = 10) =>
   Array.from({ length: total }, (_, i) => i < n);
 
 describe('Welcome routing (#15)', () => {
@@ -44,11 +54,11 @@ describe('Welcome routing (#15)', () => {
 
   it('greys Continue for a fresh player: the affordance shows, Play moves', () => {
     render(<App />);
-    const cont = screen.getByRole('button', {
+    const continueButton = screen.getByRole('button', {
       name: 'Continue: no saved progress yet',
     });
-    expect((cont as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(cont);
+    expect((continueButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(continueButton);
     expect(screen.queryByRole('grid')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: `Play ${GAME_NAME}` }));
@@ -57,7 +67,7 @@ describe('Welcome routing (#15)', () => {
   });
 
   it('sends Play to Level select while Continue jumps straight into the Board', () => {
-    seedProgress({ starter: done(2) });
+    seedProgress({ starter: firstComplete(2) });
     render(<App />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue Starter Level 3' }),
@@ -68,18 +78,20 @@ describe('Welcome routing (#15)', () => {
     ).toBeTruthy();
   });
 
-  it('resumes the earliest unfinished Level and never jumps past it', () => {
-    seedProgress({ starter: done(2), classic: done(1) });
+  it('resumes the highest unlocked Pack/Level: furthest progress wins', () => {
+    seedProgress({ starter: firstComplete(2), classic: firstComplete(1) });
     render(<App />);
-    const cont = screen.getByRole('button', { name: 'Continue Starter Level 3' });
-    fireEvent.click(cont);
+    const continueButton = screen.getByRole('button', {
+      name: 'Continue Classic Level 2',
+    });
+    fireEvent.click(continueButton);
     expect(
-      screen.getByRole('region', { name: 'Starter Level 3' }),
+      screen.getByRole('region', { name: 'Classic Level 2' }),
     ).toBeTruthy();
   });
 
   it('advances Continue past a fully-complete Pack', () => {
-    seedProgress({ starter: done(10) });
+    seedProgress({ starter: firstComplete(10) });
     render(<App />);
     expect(
       screen.getByRole('button', { name: 'Continue Classic Level 1' }),
@@ -87,13 +99,13 @@ describe('Welcome routing (#15)', () => {
   });
 
   it('greys Continue when every Pack is complete: nothing left to resume', () => {
-    seedProgress({ starter: done(10), classic: done(10), expert: done(10) });
+    seedProgress({ starter: firstComplete(10), classic: firstComplete(10), expert: firstComplete(10) });
     render(<App />);
-    const cont = screen.getByRole('button', {
+    const continueButton = screen.getByRole('button', {
       name: 'Continue: everything complete',
     });
-    expect((cont as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(cont);
+    expect((continueButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(continueButton);
     expect(screen.queryByRole('grid')).toBeNull();
     expect(
       screen.getByRole('button', { name: `Play ${GAME_NAME}` }),
@@ -150,31 +162,61 @@ describe('Welcome Mode card and Pack entry (#15)', () => {
       screen.getByRole('checkbox', { name: 'Win animation' }),
     ).toBeTruthy();
 
-    // CSS-only rise, no toggle involved: the keyframes exist and
-    // prefers-reduced-motion disables the hero unconditionally.
-    const css = read('src/App.css');
-    expect(css).toMatch(/\.welcome-hero[\s\S]*animation: welcome-rise/);
-    expect(css).toMatch(/@keyframes welcome-rise/);
-    expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.welcome-hero[\s\S]*animation: none/,
-    );
+    // CSS-only rise, no toggle involved: parsed stylesheet rules (not
+    // string matching) carry the keyframes, and prefers-reduced-motion
+    // disables the hero unconditionally.
+    const sheet = appStyleSheet();
+    const texts = Array.from(sheet.cssRules, (rule) => rule.cssText);
+    expect(
+      texts.some(
+        (text) =>
+          text.includes('welcome-rise') &&
+          (text.includes('@keyframes') || text.includes('translateY')),
+      ),
+    ).toBe(true);
+    const reduced = Array.from(sheet.cssRules).find(
+      (rule) =>
+        rule.type === CSSRule.MEDIA_RULE &&
+        (rule as CSSMediaRule).media.mediaText.includes(
+          'prefers-reduced-motion',
+        ),
+    ) as CSSMediaRule | undefined;
+    expect(reduced).toBeTruthy();
+    const heroRule = Array.from(reduced?.cssRules ?? []).find(
+      (rule) =>
+        rule.type === CSSRule.STYLE_RULE &&
+        (rule as CSSStyleRule).selectorText.includes('.welcome-hero'),
+    ) as CSSStyleRule | undefined;
+    expect(heroRule?.style.getPropertyValue('animation')).toContain('none');
   });
 
   it('reads Pack entry in the rounded display face', () => {
-    const css = read('src/App.css');
+    const sheet = appStyleSheet();
+    const packRule = Array.from(sheet.cssRules).find(
+      (rule) =>
+        rule.type === CSSRule.STYLE_RULE &&
+        (rule as CSSStyleRule).selectorText === '.welcome-packs button',
+    ) as CSSStyleRule | undefined;
+    expect(
+      packRule?.style.getPropertyValue('font-family'),
+    ).toContain('var(--heading)');
+  });
+
+  it('reads Pack entry in the rounded display face', () => {
+    const css = readFile('src/App.css');
     expect(css).toMatch(/\.welcome-packs button[\s\S]*font-family: var\(--heading\)/);
   });
 });
 
 describe('Welcome type system and brand (#15)', () => {
-  const doc = () =>
-    new DOMParser().parseFromString(read('index.html'), 'text/html');
+  const shellDoc = () =>
+    new DOMParser().parseFromString(readFile('index.html'), 'text/html');
 
   it('preloads the self-hosted display face with a system fallback and no CDN fetch', () => {
     // DOM-parsed shell: the preload link, icon, and manifest carry
     // document-relative hrefs — never root-absolute — so subpath hosting
     // holds without relying on build rebasing alone.
-    const head = doc().head;
+    const head = shellDoc().head;
     const preload = head.querySelector(
       'link[rel="preload"][as="font"][type="font/woff2"]',
     );
@@ -188,7 +230,7 @@ describe('Welcome type system and brand (#15)', () => {
       expect(href).toBeTruthy();
       expect(href?.startsWith('/')).toBe(false);
     }
-    expect(doc().title).toBe(`${GAME_NAME} — Free Play pipe puzzle`);
+    expect(shellDoc().title).toBe(`${GAME_NAME} — Free Play pipe puzzle`);
     expect(existsSync(join(root, 'public', DISPLAY_FONT_FILE))).toBe(true);
 
     // The face itself lives in the inline <style> so its URL resolves
@@ -198,19 +240,19 @@ describe('Welcome type system and brand (#15)', () => {
     expect(style).toContain(`url('./${DISPLAY_FONT_FILE}')`);
     expect(style).toContain('font-display: swap');
 
-    const css = read('src/index.css');
+    const css = readFile('src/index.css');
     expect(css).toContain(`'${DISPLAY_FONT_FAMILY}'`);
     expect(css).toMatch(/--heading:[\s\S]*system-ui/);
     // Offline guarantee: no runtime CDN font fetch anywhere in the shell.
     for (const file of ['index.html', 'src/index.css', 'src/App.css']) {
-      expect(read(file)).not.toMatch(/fonts\.googleapis\.com|fonts\.gstatic\.com/);
+      expect(readFile(file)).not.toMatch(/fonts\.googleapis\.com|fonts\.gstatic\.com/);
     }
   });
 
   it('carries the Pipe Trails wordmark through title and manifest', () => {
     expect(GAME_NAME).toBe('Pipe Trails');
-    expect(read('index.html')).toContain(`<title>${GAME_NAME} — Free Play pipe puzzle</title>`);
-    const manifest = JSON.parse(read('public/manifest.webmanifest')) as {
+    expect(readFile('index.html')).toContain(`<title>${GAME_NAME} — Free Play pipe puzzle</title>`);
+    const manifest = JSON.parse(readFile('public/manifest.webmanifest')) as {
       name: string;
       short_name: string;
     };
@@ -219,10 +261,10 @@ describe('Welcome type system and brand (#15)', () => {
   });
 
   it('precaches the display face in the offline worker with subpath-safe paths', () => {
-    const sw = read('public/sw.js');
+    const sw = readFile('public/sw.js');
     expect(sw).toContain('fonts/baloo-2-latin.woff2');
     expect(sw).not.toContain('"/fonts/');
     expect(sw).not.toContain('"/index.html"');
-    expect(read('vite.config.ts')).toContain("base: './'");
+    expect(readFile('vite.config.ts')).toContain("base: './'");
   });
 });

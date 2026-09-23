@@ -1,6 +1,4 @@
 import type { Level } from './types';
-import { displayDifficulty } from './pack';
-import type { Pack } from './pack';
 
 export const PROGRESS_KEY = 'flow-free-clone:progress:v1';
 export const PROGRESS_V2_KEY = 'flow-free-clone:progress:v2';
@@ -99,26 +97,6 @@ export function packProgressCount(
   const arr = progress[packId];
   if (!Array.isArray(arr)) return { done: 0, total: 0 };
   return { done: arr.filter((c) => c === true).length, total: arr.length };
-}
-
-export interface PackSummary {
-  done: number;
-  total: number;
-  difficulty: string;
-}
-
-/**
- * One per-Pack shape for entry buttons, tabs, and panels (#15): progress
- * counts plus display Difficulty, instead of recomputing the pair
- * per call site.
- */
-export function describePack(progress: PackProgress, pack: Pack): PackSummary {
-  const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
-  return {
-    done: arr.filter((c) => c === true).length,
-    total: pack.levels.length,
-    difficulty: displayDifficulty(pack.difficulty),
-  };
 }
 
 /**
@@ -231,18 +209,24 @@ export interface ContinueTarget {
 }
 
 /**
- * Continue target for the Welcome Screen (#15): resume the earliest
- * unfinished Level scanning Packs in order (sequential unlock makes it
- * unlocked by construction), so progress in a later Pack never jumps
- * ahead of an earlier unplayed Level. Returns null when every Level in
- * every Pack is complete (nothing left to resume) or with no Packs.
+ * Continue target for the Welcome Screen (#15): resume the highest
+ * unlocked Pack/Level — the furthest Pack with any completion, at its
+ * first incomplete Level (unlocked by construction), advancing past
+ * fully-complete Packs. Returns null when nothing is resumable: a fresh
+ * player with no progress, every Pack complete, or no Packs at all.
  * Ragged progress arrays read as all-locked beyond their length.
  */
 export function findContinueTarget(
   progress: PackProgress,
   packs: PackLike[],
 ): ContinueTarget | null {
-  for (const pack of packs) {
+  let furthest = -1;
+  packs.forEach((pack, i) => {
+    if (packProgressCount(progress, pack.id).done > 0) furthest = i;
+  });
+  if (furthest === -1) return null;
+  for (let i = furthest; i < packs.length; i++) {
+    const pack = packs[i];
     const arr = Array.isArray(progress[pack.id]) ? progress[pack.id] : [];
     const firstOpen = pack.levels.findIndex((_, level) => arr[level] !== true);
     if (firstOpen !== -1) return { packId: pack.id, index: firstOpen };

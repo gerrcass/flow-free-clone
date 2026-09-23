@@ -1,11 +1,7 @@
 import { useState } from 'react';
-import { findPackById, packAriaLabel } from '../game/pack';
+import { describePack, findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
-import {
-  describePack,
-  isUnlockedInPack,
-  type PackProgress,
-} from '../game/progress';
+import { isUnlockedInPack, type PackProgress } from '../game/progress';
 
 interface LevelSelectProps {
   packs: Pack[];

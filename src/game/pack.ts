@@ -1,4 +1,6 @@
 import type { Level } from './types';
+import { packProgressCount } from './progress';
+import type { PackProgress } from './progress';
 
 export type Difficulty = 'starter' | 'classic' | 'expert';
 
@@ -15,8 +17,10 @@ export function findPackById(packs: Pack[], packId: string): Pack {
 }
 
 /** Capitalized Difficulty for display and accessible labels (#15). */
-export function displayDifficulty(difficulty: Difficulty): string {
-  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+export function displayDifficulty(
+  difficulty: Difficulty,
+): Capitalize<Difficulty> {
+  return (difficulty.charAt(0).toUpperCase() + difficulty.slice(1)) as Capitalize<Difficulty>;
 }
 
 /**
@@ -25,6 +29,25 @@ export function displayDifficulty(difficulty: Difficulty): string {
  */
 export function packAriaLabel(pack: Pack, done: number, total: number): string {
   return `${pack.name} Pack, ${displayDifficulty(pack.difficulty)} Difficulty, ${done} of ${total} complete`;
+}
+
+export interface PackSummary {
+  done: number;
+  total: number;
+  difficulty: Capitalize<Difficulty>;
+}
+
+/**
+ * One per-Pack shape for entry buttons, tabs, and panels (#15): progress
+ * counts plus display Difficulty. Counting delegates to the progress
+ * seam's counter, so one Pack is counted one way.
+ */
+export function describePack(progress: PackProgress, pack: Pack): PackSummary {
+  return {
+    done: packProgressCount(progress, pack.id).done,
+    total: pack.levels.length,
+    difficulty: displayDifficulty(pack.difficulty),
+  };
 }
 
 /**

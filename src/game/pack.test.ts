@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PACK,
   PACKS,
+  describePack,
   displayDifficulty,
   findPackById,
   packAriaLabel,
@@ -120,5 +121,18 @@ describe('Multi-Pack store (#12)', () => {
     expect(packAriaLabel(PACKS[2], 7, 10)).toBe(
       'Expert Pack, Expert Difficulty, 7 of 10 complete',
     );
+  });
+
+  it('describes a Pack with progress and display Difficulty in one shape (#15)', () => {
+    expect(describePack({ starter: [true, false] }, PACKS[0])).toEqual({
+      done: 1,
+      total: 10,
+      difficulty: 'Starter',
+    });
+    expect(describePack({}, PACKS[1])).toEqual({
+      done: 0,
+      total: 10,
+      difficulty: 'Classic',
+    });
   });
 });

@@ -1,6 +1,6 @@
-import { findPackById, packAriaLabel } from '../game/pack';
+import { describePack, findPackById, packAriaLabel } from '../game/pack';
 import type { Pack } from '../game/pack';
-import { describePack, findContinueTarget } from '../game/progress';
+import { findContinueTarget } from '../game/progress';
 import type { ContinueTarget, PackProgress, Settings } from '../game/progress';
 import { GAME_NAME } from '../game/theme';
 import SettingsControls from './SettingsControls';
@@ -18,7 +18,7 @@ interface WelcomeProps {
 
 /**
  * Pre-game Welcome Screen (#15, ADR 0006): brand hero, Continue resuming
- * the earliest unfinished Level in Pack order, Mode display (Free Play
+ * the highest unlocked Pack/Level, Mode display (Free Play
  * active, Time Trial reserved for v3 with no logic behind it), and Pack
  * entry into Level select. Toggles live here too so accessibility settings
  * carry through from the first moment.
@@ -32,15 +32,12 @@ export default function Welcome({
   onContinue,
   onEnterPack,
 }: WelcomeProps) {
-  // Earliest unfinished Level in Pack order, or null when nothing is
-  // resumable (everything complete). Continue stays visible but greyed
-  // whenever there is nothing to resume — fresh or finished, mirroring
-  // the Time Trial pattern — while Play is always the way forward.
+  // Highest unlocked Pack/Level, or null when nothing is resumable
+  // (fresh player or everything complete). Continue stays visible but
+  // greyed then — the affordance mirrors the Time Trial pattern —
+  // while Play is always the way forward.
   const target = findContinueTarget(progress, packs);
   const targetPack = target ? findPackById(packs, target.packId) : undefined;
-  const hasProgress = packs.some(
-    (pack) => describePack(progress, pack).done > 0,
-  );
   const complete =
     packs.length > 0 &&
     packs.every(
@@ -56,7 +53,7 @@ export default function Welcome({
         <p className="tagline">Connect every Color, fill every Cell. Free Play, no timer.</p>
       </header>
 
-      {target && targetPack && hasProgress ? (
+      {target && targetPack ? (
         <button
           type="button"
           onClick={() => onContinue(target)}
